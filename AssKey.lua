@@ -15,12 +15,16 @@ for key, value in pairs(AssKey.defaults) do
 	end
 end
 
-local hookedFrames = {}
-local keybindTexts = {}
-local keybindCache = {}
+-- Runtime storage in AssKey table
+AssKey.hookedFrames = {}
+AssKey.keybindTexts = {}
+AssKey.keybindCache = {}
 
+-- ========================
+-- ASSKEY METHODS
+-- ========================
 function AssKey:OnEvent(event, addonName, ...)
-	if event == "ADDON_LOADED" and addonName == AssKey.name then
+	if event == "ADDON_LOADED" and addonName == self.name then
 		self:InitializeOptions()
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		self:ScanAndHookFrames()
@@ -35,24 +39,59 @@ function AssKey:OnEvent(event, addonName, ...)
 	end
 end
 
-AssKey:SetScript("OnEvent", AssKey.OnEvent)
-AssKey:RegisterEvent("ADDON_LOADED")
-AssKey:RegisterEvent("PLAYER_ENTERING_WORLD")
-AssKey:RegisterEvent("ASSISTED_COMBAT_ACTION_SPELL_CAST")
-AssKey:RegisterEvent("UPDATE_BINDINGS")
-AssKey:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
-AssKey:RegisterEvent("PLAYER_REGEN_ENABLED")
-AssKey:RegisterEvent("PLAYER_REGEN_DISABLED")
+function AssKey:ScanAndHookFrames()
+	local frame = EnumerateFrames()
+	while frame do
+		if frame.UpdateAssistedCombatRotationFrame and not self.hookedFrames[frame] then
+			self:HookSingleButtonFrame(frame)
+		end
+		frame = EnumerateFrames(frame)
+	end
+end
 
--- Get keybind for a spell ID
-local function GetKeybindForSpell(spellID)
-	if not spellID or keybindCache[spellID] == false then
+function AssKey:HookSingleButtonFrame(frame)
+	if self.hookedFrames[frame] then return end
+	self.hookedFrames[frame] = true
+
+	-- Update keybind when frame updates
+	if frame.UpdateAssistedCombatRotationFrame then
+		hooksecurefunc(frame, "UpdateAssistedCombatRotationFrame", function(self)
+			local spellID = AssKey_GetCurrentRecommendedSpell()
+			AssKey_UpdateKeybindOnFrame(self, spellID)
+		end)
+	end
+
+	-- Also update on show
+	hooksecurefunc(frame, "Show", function(self)
+		local spellID = AssKey_GetCurrentRecommendedSpell()
+		AssKey_UpdateKeybindOnFrame(self, spellID)
+	end)
+
+	-- Initial update
+	local spellID = AssKey_GetCurrentRecommendedSpell()
+	AssKey_UpdateKeybindOnFrame(frame, spellID)
+end
+
+function AssKey:UpdateAllKeybinds()
+	local spellID = AssKey_GetCurrentRecommendedSpell()
+	for frame, _ in pairs(self.hookedFrames) do
+		if frame:IsVisible() then
+			AssKey_UpdateKeybindOnFrame(frame, spellID)
+		end
+	end
+end
+
+-- ========================
+-- HELPER FUNCTIONS (local)
+-- ========================
+function AssKey_GetKeybindForSpell(spellID)
+	if not spellID or AssKey.keybindCache[spellID] == false then
 		return ""
 	end
 
 	-- Check cache first
-	if keybindCache[spellID] then
-		return keybindCache[spellID]
+	if AssKey.keybindCache[spellID] then
+		return AssKey.keybindCache[spellID]
 	end
 
 	-- Find which action bar slot has this spell
@@ -62,20 +101,19 @@ local function GetKeybindForSpell(spellID)
 			local buttonNum = ((slot - 1) % 12) + 1
 			local binding = GetBindingKey("ACTIONBUTTON" .. buttonNum)
 			if binding then
-				keybindCache[spellID] = GetBindingText(binding)
-				return keybindCache[spellID]
+				AssKey.keybindCache[spellID] = GetBindingText(binding)
+				return AssKey.keybindCache[spellID]
 			end
 			break
 		end
 	end
 
 	-- Cache negative result
-	keybindCache[spellID] = false
+	AssKey.keybindCache[spellID] = false
 	return ""
 end
 
--- Get current recommended spell
-local function GetCurrentRecommendedSpell()
+function AssKey_GetCurrentRecommendedSpell()
 	-- Modern method (10.1.7+)
 	if C_AssistedCombat and C_AssistedCombat.GetNextSpell then
 		return C_AssistedCombat.GetNextSpell()
@@ -105,11 +143,10 @@ local function GetCurrentRecommendedSpell()
 	return nil
 end
 
--- Create or update keybind text on a frame
-local function UpdateKeybindOnFrame(frame, spellID)
+function AssKey_UpdateKeybindOnFrame(frame, spellID)
 	if not frame or not frame:IsVisible() then return end
 
-	local text = keybindTexts[frame]
+	local text = AssKey.keybindTexts[frame]
 	local showKeybinds = AssKeyDB.showKeybinds
 
 	-- Hide if disabled
@@ -126,7 +163,7 @@ local function UpdateKeybindOnFrame(frame, spellID)
 		text:SetTextColor(1, 1, 1)
 		text:SetShadowOffset(1, -1)
 		text:SetShadowColor(0, 0, 0, 1)
-		keybindTexts[frame] = text
+		AssKey.keybindTexts[frame] = text
 	end
 
 	-- Update font size
@@ -151,7 +188,7 @@ local function UpdateKeybindOnFrame(frame, spellID)
 
 	-- Set text if we have a spell and keybind
 	if spellID then
-		local keybind = GetKeybindForSpell(spellID)
+		local keybind = AssKey_GetKeybindForSpell(spellID)
 		if keybind ~= "" then
 			text:SetText(keybind)
 			text:Show()
@@ -162,75 +199,9 @@ local function UpdateKeybindOnFrame(frame, spellID)
 	text:Hide()
 end
 
--- Hook into Blizzard's frames
-local function HookSingleButtonFrame(frame)
-	if hookedFrames[frame] then return end
-	hookedFrames[frame] = true
-
-	-- Update keybind when frame updates
-	if frame.UpdateAssistedCombatRotationFrame then
-		hooksecurefunc(frame, "UpdateAssistedCombatRotationFrame", function(self)
-			local spellID = GetCurrentRecommendedSpell()
-			UpdateKeybindOnFrame(self, spellID)
-		end)
-	end
-
-	-- Also update on show
-	hooksecurefunc(frame, "Show", function(self)
-		local spellID = GetCurrentRecommendedSpell()
-		UpdateKeybindOnFrame(self, spellID)
-	end)
-
-	-- Initial update
-	local spellID = GetCurrentRecommendedSpell()
-	UpdateKeybindOnFrame(frame, spellID)
-end
-
--- Scan for Single-Button Assistant frames
-local function ScanAndHookFrames()
-	local frame = EnumerateFrames()
-	while frame do
-		if frame.UpdateAssistedCombatRotationFrame and not hookedFrames[frame] then
-			HookSingleButtonFrame(frame)
-		end
-		frame = EnumerateFrames(frame)
-	end
-end
-
--- Update all keybinds
-local function UpdateAllKeybinds()
-	local spellID = GetCurrentRecommendedSpell()
-	for frame, _ in pairs(hookedFrames) do
-		if frame:IsVisible() then
-			UpdateKeybindOnFrame(frame, spellID)
-		end
-	end
-end
-
--- Slash command
-SLASH_SINGLEBUTTONKEYBINDS1 = "/asskey"
-SLASH_SINGLEBUTTONKEYBINDS2 = "/ak"
-SlashCmdList["ASSKEYKEYBINDS"] = function()
-	AssKey_Settings()
-end
-
-function AssKey_AddonCompartmentClick(addonName, buttonName, menuButtonFrame)
-	if addonName == "AssKey" then
-		AssKey_Settings()
-	end
-end
-
-function AssKey_Settings()
-	if not InCombatLockdown() then
-		if AssKey.category then
-			Settings.OpenToCategory(AssKey.category:GetID())
-		end
-	else
-		print("MinimapAutoZoom: Cannot open settings while in combat!")
-	end
-end
-
--- Settings panel (optional - can remove if you don't want settings)
+-- ========================
+-- SETTINGS & UI
+-- ========================
 function AssKey:InitializeOptions()
 	local category = Settings.RegisterVerticalLayoutCategory(self.name)
 
@@ -254,3 +225,41 @@ function AssKey:InitializeOptions()
 	Settings.RegisterAddOnCategory(category)
 	self.category = category
 end
+
+-- Addon Compartment Function (referenced in TOC)
+function AssKey_AddonCompartmentClick(addonName, buttonName, menuButtonFrame)
+	if addonName == "AssKey" then
+		AssKey_Settings()
+	end
+end
+
+function AssKey_Settings()
+	if not InCombatLockdown() then
+		if AssKey.category then
+			Settings.OpenToCategory(AssKey.category:GetID())
+		end
+	else
+		print("AssKey: Cannot open settings while in combat!")
+	end
+end
+
+-- ========================
+-- SLASH COMMANDS
+-- ========================
+SLASH_ASSKEY1 = "/asskey"
+SLASH_ASSKEY2 = "/ak"
+SlashCmdList["ASSKEY"] = function()
+	AssKey_Settings()
+end
+
+-- ========================
+-- INITIALIZATION
+-- ========================
+AssKey:SetScript("OnEvent", AssKey.OnEvent)
+AssKey:RegisterEvent("ADDON_LOADED")
+AssKey:RegisterEvent("PLAYER_ENTERING_WORLD")
+AssKey:RegisterEvent("ASSISTED_COMBAT_ACTION_SPELL_CAST")
+AssKey:RegisterEvent("UPDATE_BINDINGS")
+AssKey:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+AssKey:RegisterEvent("PLAYER_REGEN_ENABLED")
+AssKey:RegisterEvent("PLAYER_REGEN_DISABLED")
