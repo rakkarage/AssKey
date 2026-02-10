@@ -201,7 +201,7 @@ end)
 -- Settings panel (optional - can remove if you don't want settings)
 local function CreateSettingsPanel()
 	local panel = CreateFrame("Frame")
-	panel.name = "Single-Button Keybinds"
+	panel.name = "AssKey"
 
 	-- Title
 	local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -211,7 +211,7 @@ local function CreateSettingsPanel()
 	-- Show Keybinds checkbox
 	local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
 	cb:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -20)
-	cb:SetChecked(SimpleSingleButtonKeybindsDB.showKeybinds)
+	cb:SetChecked(AssKeyDB.showKeybinds)
 	cb.text:SetText("Show Keybinds")
 	cb:SetScript("OnClick", function(self)
 		AssKeyDB.showKeybinds = self:GetChecked()
