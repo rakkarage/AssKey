@@ -1,6 +1,25 @@
 local Alpha = 0.0
 AssKeyAlpha = AssKeyAlpha or Alpha
 
+-- ---------------------------------------------------------------------
+-- UTILITY FUNCTIONS (Add these at the top)
+-- ---------------------------------------------------------------------
+local function Clamp(Value, Min, Max)
+    return math.min(math.max(Value, Min), Max)
+end
+
+local function Validate_Alpha()
+    Alpha = Clamp(AssKeyAlpha or 0.0, 0, 1)
+    AssKeyAlpha = Alpha
+end
+
+-- Initialize settings at the top (yes, move them here)
+AssKeyShowKeybinds = AssKeyShowKeybinds or true
+AssKeyFontSize = AssKeyFontSize or 12
+
+-- ---------------------------------------------------------------------
+-- KEYBIND SYSTEM
+-- ---------------------------------------------------------------------
 local KeybindFont = "GameFontHighlightSmall"
 local KeybindTexts = {}
 local LastKnownSpells = {}
@@ -44,20 +63,28 @@ local function DetectCurrentSpellFromBlizzard()
         return C_AssistedCombat.GetNextSpell()
     end
     
-    -- Method 2: Scan tooltip of the main button
+    -- Method 2: Scan tooltip of the main button (fallback)
     local mainButton = SingleButtonAssistFrame
     if mainButton and mainButton:IsVisible() then
-        -- Store tooltip text temporarily
+        -- Temporarily show tooltip to get spell info
+        local oldOwner = GameTooltip:GetOwner()
         GameTooltip:SetOwner(mainButton, "ANCHOR_NONE")
-        mainButton:GetScript("OnEnter")(mainButton)
+        
+        -- Try to trigger tooltip update
+        if mainButton:GetScript("OnEnter") then
+            mainButton:GetScript("OnEnter")(mainButton)
+        end
         
         -- Extract spell from tooltip
-        local tooltipText = GameTooltipTextLeft1:GetText()
+        local tooltipText = GameTooltipTextLeft1 and GameTooltipTextLeft1:GetText()
         if tooltipText then
-            local spellName = tooltipText:gsub("^|c%x%x%x%x%x%x%x%x(.*)|r$", "%1")
+            -- Clean color codes
+            local spellName = tooltipText:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
             local spellID = GetSpellInfo(spellName)
+            GameTooltip:SetOwner(oldOwner) -- Restore original owner
             return spellID
         end
+        GameTooltip:SetOwner(oldOwner) -- Restore original owner
     end
     
     return nil
@@ -67,24 +94,38 @@ end
 local function AddKeybindTextToFrame(frame, spellID)
     if not frame or not frame:IsVisible() then return end
     
+    -- Don't add if keybinds are disabled
+    if not AssKeyShowKeybinds then
+        local existingText = KeybindTexts[frame]
+        if existingText then
+            existingText:Hide()
+        end
+        return
+    end
+    
     local keybindText = KeybindTexts[frame]
     if not keybindText then
         -- Create keybind text overlay
         keybindText = frame:CreateFontString(nil, "OVERLAY", KeybindFont)
-        keybindText:SetPoint("BOTTOM", frame, "BOTTOM", 0, -15) -- Position below the button
-        keybindText:SetTextColor(1, 1, 1, 1) -- White
+        keybindText:SetPoint("BOTTOM", frame, "BOTTOM", 0, -15)
+        keybindText:SetTextColor(1, 1, 1, 1)
         keybindText:SetShadowOffset(1, -1)
         keybindText:SetShadowColor(0, 0, 0, 1)
-        keybindText:SetTextHeight(12) -- Adjust size
+        keybindText:SetFont(keybindText:GetFont(), AssKeyFontSize or 12)
+        keybindText:Hide()
         
         KeybindTexts[frame] = keybindText
     end
+    
+    -- Update font size if needed
+    local fontPath, _, fontFlags = keybindText:GetFont()
+    keybindText:SetFont(fontPath, AssKeyFontSize or 12, fontFlags)
     
     if spellID then
         local keybind = GetKeybindForSpell(spellID)
         if keybind ~= "" then
             keybindText:SetText(keybind)
-            keybindText:SetAlpha(Alpha) -- Match arrow transparency
+            keybindText:SetAlpha(Alpha)
             keybindText:Show()
             LastKnownSpells[frame] = spellID
             return
@@ -143,29 +184,9 @@ local function ScheduleKeybindUpdate()
     end)
 end
 
--- Clear keybind cache when bindings change
-local Event_Frame = CreateFrame("Frame")
-Event_Frame:RegisterEvent("UPDATE_BINDINGS")
-Event_Frame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
-Event_Frame:RegisterEvent("SPELLS_CHANGED")
-Event_Frame:RegisterEvent("PLAYER_REGEN_ENABLED")
-Event_Frame:RegisterEvent("PLAYER_REGEN_DISABLED")
-
-Event_Frame:SetScript("OnEvent", function(_, event)
-    if event == "UPDATE_BINDINGS" or event == "ACTIONBAR_SLOT_CHANGED" or event == "SPELLS_CHANGED" then
-        -- Clear cache when bindings or spells change
-        wipe(KeybindCache)
-        ScheduleKeybindUpdate()
-    elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
-        -- Update keybinds when entering/exiting combat
-        ScheduleKeybindUpdate()
-    end
-end)
-
 -- ---------------------------------------------------------------------
--- MODIFIED HOOK FUNCTIONS
+-- HOOK SYSTEM (Modified to integrate keybinds)
 -- ---------------------------------------------------------------------
-
 local Hooked_Textures = {}
 local Hooked_Buttons = {}
 local Applying = false
@@ -209,6 +230,11 @@ local function Hook_Rotation_Frame(Frame)
         
         -- Update keybind when frame is shown
         hooksecurefunc(Frame, "Show", function(self)
+            ScheduleKeybindUpdate()
+        end)
+        
+        -- Update keybind when frame updates
+        hooksecurefunc(Frame, "UpdateAssistedCombatRotationFrame", function(self)
             ScheduleKeybindUpdate()
         end)
     end
@@ -268,6 +294,11 @@ local function Reapply_All()
     ScheduleKeybindUpdate() -- Update keybinds too
 end
 
+-- ---------------------------------------------------------------------
+-- EVENT HANDLING
+-- ---------------------------------------------------------------------
+local Event_Frame = CreateFrame("Frame")
+
 -- Add events for keybind updates
 local Rescan_Events = {
     "PLAYER_ENTERING_WORLD",
@@ -278,6 +309,11 @@ local Rescan_Events = {
     "UPDATE_EXTRA_ACTIONBAR",
     "UPDATE_OVERRIDE_ACTIONBAR",
     "ASSISTED_COMBAT_ACTION_SPELL_CAST", -- Important: When assistant suggests new spell
+    "UPDATE_BINDINGS",
+    "ACTIONBAR_SLOT_CHANGED",
+    "SPELLS_CHANGED",
+    "PLAYER_REGEN_ENABLED",
+    "PLAYER_REGEN_DISABLED",
 }
 
 for _, Event in ipairs(Rescan_Events) do
@@ -307,13 +343,20 @@ Event_Frame:SetScript("OnEvent", function(_, Event)
     elseif Event == "ASSISTED_COMBAT_ACTION_SPELL_CAST" then
         -- Immediately update keybind when new spell is suggested
         ScheduleKeybindUpdate()
+    elseif Event == "UPDATE_BINDINGS" or Event == "ACTIONBAR_SLOT_CHANGED" or Event == "SPELLS_CHANGED" then
+        -- Clear cache when bindings or spells change
+        wipe(KeybindCache)
+        ScheduleKeybindUpdate()
+    elseif Event == "PLAYER_REGEN_ENABLED" or Event == "PLAYER_REGEN_DISABLED" then
+        -- Update keybinds when entering/exiting combat
+        ScheduleKeybindUpdate()
     else
         Schedule_Scan()
     end
 end)
 
 -- ---------------------------------------------------------------------
--- MODIFIED SETTINGS - Add keybind options
+-- SETTINGS PANEL
 -- ---------------------------------------------------------------------
 local Settings_Category
 do
@@ -435,6 +478,12 @@ SlashCmdList["ASSKEY"] = function()
     Settings.OpenToCategory(Settings_Category:GetID())
 end
 
--- Initialize settings
-AssKeyShowKeybinds = AssKeyShowKeybinds or true
-AssKeyFontSize = AssKeyFontSize or 12
+-- ---------------------------------------------------------------------
+-- INITIALIZATION
+-- ---------------------------------------------------------------------
+-- Trigger initial scan
+C_Timer.After(1, function()
+    Validate_Alpha()
+    Scan_And_Hook()
+    ScheduleKeybindUpdate()
+end)
