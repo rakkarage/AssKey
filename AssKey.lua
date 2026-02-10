@@ -1,16 +1,48 @@
-local ADDON_NAME = "AssKey"
-
-AssKeyDB = AssKeyDB or {
+local AssKey = CreateFrame("Frame")
+AssKey.name = "AssKey"
+AssKey.defaults = {
 	showKeybinds = true,
 	fontSize = 12,
-	position = "BOTTOM", -- "BOTTOM", "TOP", "LEFT", "RIGHT"
+	position = "BOTTOM",
 	offsetX = 0,
 	offsetY = -15,
 }
 
+AssKeyDB = AssKeyDB or {}
+for key, value in pairs(AssKey.defaults) do
+	if AssKeyDB[key] == nil then
+		AssKeyDB[key] = value
+	end
+end
+
 local hookedFrames = {}
 local keybindTexts = {}
 local keybindCache = {}
+
+function AssKey:OnEvent(event, addonName, ...)
+	if event == "ADDON_LOADED" and addonName == ADDON_NAME then
+		self:InitializeOptions()
+	elseif event == "PLAYER_ENTERING_WORLD" then
+		self:ScanAndHookFrames()
+		C_Timer.After(1, function() self:ScanAndHookFrames() end)
+	elseif event == "ASSISTED_COMBAT_ACTION_SPELL_CAST" then
+		self:UpdateAllKeybinds()
+	elseif event == "UPDATE_BINDINGS" or event == "ACTIONBAR_SLOT_CHANGED" then
+		wipe(self.keybindCache)
+		self:UpdateAllKeybinds()
+	elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
+		self:UpdateAllKeybinds()
+	end
+end
+
+AssKey:SetScript("OnEvent", AssKey.OnEvent)
+AssKey:RegisterEvent("ADDON_LOADED")
+AssKey:RegisterEvent("PLAYER_ENTERING_WORLD")
+AssKey:RegisterEvent("ASSISTED_COMBAT_ACTION_SPELL_CAST")
+AssKey:RegisterEvent("UPDATE_BINDINGS")
+AssKey:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+AssKey:RegisterEvent("PLAYER_REGEN_ENABLED")
+AssKey:RegisterEvent("PLAYER_REGEN_DISABLED")
 
 -- Get keybind for a spell ID
 local function GetKeybindForSpell(spellID)
@@ -175,74 +207,50 @@ local function UpdateAllKeybinds()
 	end
 end
 
--- Event handling
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-eventFrame:RegisterEvent("ASSISTED_COMBAT_ACTION_SPELL_CAST")
-eventFrame:RegisterEvent("UPDATE_BINDINGS")
-eventFrame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
-eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
-
-eventFrame:SetScript("OnEvent", function(_, event)
-	if event == "PLAYER_ENTERING_WORLD" then
-		ScanAndHookFrames()
-		C_Timer.After(1, ScanAndHookFrames) -- Second pass after UI loads
-	elseif event == "ASSISTED_COMBAT_ACTION_SPELL_CAST" then
-		UpdateAllKeybinds()
-	elseif event == "UPDATE_BINDINGS" or event == "ACTIONBAR_SLOT_CHANGED" then
-		wipe(keybindCache)
-		UpdateAllKeybinds()
-	elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
-		UpdateAllKeybinds()
-	end
-end)
-
--- Settings panel (optional - can remove if you don't want settings)
-local function CreateSettingsPanel()
-	local panel = CreateFrame("Frame")
-	panel.name = "AssKey"
-
-	-- Title
-	local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	title:SetPoint("TOPLEFT", 16, -16)
-	title:SetText("Single-Button Assistant Keybinds")
-
-	-- Show Keybinds checkbox
-	local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-	cb:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -20)
-	cb:SetChecked(AssKeyDB.showKeybinds)
-	cb.text:SetText("Show Keybinds")
-	cb:SetScript("OnClick", function(self)
-		AssKeyDB.showKeybinds = self:GetChecked()
-		UpdateAllKeybinds()
-	end)
-
-	-- Font Size slider
-	local sizeText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	sizeText:SetPoint("TOPLEFT", cb, "BOTTOMLEFT", 0, -30)
-	sizeText:SetText("Font Size:")
-
-	local slider = CreateFrame("Slider", nil, panel, "UISliderTemplate")
-	slider:SetPoint("TOPLEFT", sizeText, "BOTTOMLEFT", 0, -10)
-	slider:SetSize(200, 20)
-	slider:SetMinMaxValues(8, 20)
-	slider:SetValueStep(1)
-	slider:SetValue(AssKeyDB.fontSize or 12)
-	slider:SetScript("OnValueChanged", function(self, value)
-		AssKeyDB.fontSize = math.floor(value)
-		UpdateAllKeybinds()
-	end)
-
-	InterfaceOptions_AddCategory(panel)
-end
-
 -- Slash command
 SLASH_SINGLEBUTTONKEYBINDS1 = "/asskey"
 SLASH_SINGLEBUTTONKEYBINDS2 = "/ak"
 SlashCmdList["ASSKEYKEYBINDS"] = function()
-	InterfaceOptionsFrame_OpenToCategory("AssKey")
+	AssKey_Settings()
 end
 
--- Initialize
-CreateSettingsPanel()
+function AssKey_AddonCompartmentClick(addonName, buttonName, menuButtonFrame)
+	if addonName == "AssKey" then
+		AssKey_Settings()
+	end
+end
+
+function AssKey_Settings()
+	if not InCombatLockdown() then
+		if AssKey.category then
+			Settings.OpenToCategory(AssKey.category:GetID())
+		end
+	else
+		print("MinimapAutoZoom: Cannot open settings while in combat!")
+	end
+end
+
+-- Settings panel (optional - can remove if you don't want settings)
+function AssKey:InitializeOptions()
+	local category = Settings.RegisterVerticalLayoutCategory(self.name)
+
+	-- Show Keybinds checkbox
+	Settings.CreateCheckbox(category,
+		Settings.RegisterAddOnSetting(category, "AssKey_ShowKeybinds", "showKeybinds",
+			AssKeyDB, Settings.VarType.Boolean, "Show Keybinds", true),
+		"Display keybinds on Single-Button Assistant frames")
+
+	-- Font Size slider
+	local fontSizeOptions = Settings.CreateSliderOptions(8, 20, 1)
+	fontSizeOptions:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(value)
+		return string.format("%d px", value)
+	end)
+
+	Settings.CreateSlider(category,
+		Settings.RegisterAddOnSetting(category, "AssKey_FontSize", "fontSize",
+			AssKeyDB, Settings.VarType.Number, "Font Size", 12),
+		fontSizeOptions, "Keybind text font size")
+
+	Settings.RegisterAddOnCategory(category)
+	self.category = category
+end
