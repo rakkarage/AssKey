@@ -20,7 +20,7 @@ local keybindTexts = {}
 local keybindCache = {}
 
 function AssKey:OnEvent(event, addonName, ...)
-	if event == "ADDON_LOADED" and addonName == ADDON_NAME then
+	if event == "ADDON_LOADED" and addonName == AssKey.name then
 		self:InitializeOptions()
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		self:ScanAndHookFrames()
