@@ -26,16 +26,25 @@ AssKey.keybindCache = {}
 function AssKey:OnEvent(event, addonName, ...)
 	if event == "ADDON_LOADED" and addonName == self.name then
 		self:InitializeOptions()
+		self:RegisterEvent("PLAYER_ENTERING_WORLD")
+		self:RegisterEvent("UPDATE_BINDINGS")
+		self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+
+		-- AssKey:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") -- For spell casts
+		-- AssKey:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED") -- When you cast something
+		-- AssKey:RegisterEvent("SPELL_UPDATE_COOLDOWN") -- When cooldowns update
+		-- AssKey:RegisterEvent("SPELL_UPDATE_CHARGES") -- When charges update
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		self:ScanAndHookFrames()
 		C_Timer.After(1, function() self:ScanAndHookFrames() end)
-	elseif event == "ASSISTED_COMBAT_ACTION_SPELL_CAST" then
-		self:UpdateAllKeybinds()
 	elseif event == "UPDATE_BINDINGS" or event == "ACTIONBAR_SLOT_CHANGED" then
 		wipe(AssKey.keybindCache)
 		self:UpdateAllKeybinds()
-	elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
-		self:UpdateAllKeybinds()
+		-- elseif event == "COMBAT_LOG_EVENT_UNFILTERED" or
+		-- 	event == "UNIT_SPELLCAST_SUCCEEDED" or
+		-- 	event == "SPELL_UPDATE_COOLDOWN" or
+		-- 	event == "SPELL_UPDATE_CHARGES" then
+		-- 	self:UpdateAllKeybinds()
 	end
 end
 
@@ -86,8 +95,11 @@ end
 -- ========================
 function AssKey_GetKeybindForSpell(spellID)
 	if not spellID or AssKey.keybindCache[spellID] == false then
+		print("[AssKey] No spellID provided:", spellID)
 		return ""
 	end
+
+	--	print("[AssKey] Looking for keybind for spell:", spellID)
 
 	-- Check cache first
 	if AssKey.keybindCache[spellID] then
@@ -99,10 +111,13 @@ function AssKey_GetKeybindForSpell(spellID)
 		local actionType, id = GetActionInfo(slot)
 		if actionType == "spell" and id == spellID then
 			local buttonNum = ((slot - 1) % 12) + 1
-			local binding = GetBindingKey("ACTIONBUTTON" .. buttonNum)
-			if binding then
-				AssKey.keybindCache[spellID] = GetBindingText(binding)
-				return AssKey.keybindCache[spellID]
+			local bindingKey = GetBindingKey("ACTIONBUTTON" .. buttonNum)
+			local bindingText = bindingKey and GetBindingText(bindingKey) or "NO BINDING"
+			print(string.format("[AssKey] FOUND! Slot:%d, Bar:%d, Button:%d, Binding:%s, Text:%s",
+				slot, math.floor((slot - 1) / 12) + 1, buttonNum, bindingKey or "nil", bindingText))
+			if bindingKey then
+				AssKey.keybindCache[spellID] = bindingText
+				return bindingText
 			end
 			break
 		end
@@ -114,30 +129,30 @@ function AssKey_GetKeybindForSpell(spellID)
 end
 
 function AssKey_GetCurrentRecommendedSpell()
-	-- Modern method (10.1.7+)
-	if C_AssistedCombat and C_AssistedCombat.GetNextSpell then
-		return C_AssistedCombat.GetNextSpell()
-	end
+	if not C_AssistedCombat then return nil end
 
-	-- Legacy fallback: Look for SingleButtonAssistFrame
-	local frame = _G["SingleButtonAssistFrame"]
-	if frame and frame:IsVisible() then
-		-- Try to get spell from tooltip
-		local oldOwner = GameTooltip:GetOwner()
-		GameTooltip:SetOwner(frame, "ANCHOR_NONE")
+	-- -- Method 1: GetActionSpell() - Most likely for the current recommendation
+	-- if C_AssistedCombat.GetActionSpell then
+	-- 	local spellID = C_AssistedCombat.GetActionSpell()
+	-- 	if spellID and spellID > 0 then
+	-- 		return spellID
+	-- 	end
+	-- end
 
-		if frame:GetScript("OnEnter") then
-			frame:GetScript("OnEnter")(frame)
-		end
-
-		local tooltipText = GameTooltipTextLeft1 and GameTooltipTextLeft1:GetText()
-		if tooltipText then
-			local spellName = tooltipText:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-			local spellID = GetSpellInfo(spellName)
-			GameTooltip:SetOwner(oldOwner)
+	-- Method 2: GetNextCastSpell() - For what you're about to cast
+	if C_AssistedCombat.GetNextCastSpell then
+		local spellID = C_AssistedCombat.GetNextCastSpell()
+		if spellID and spellID > 0 then
 			return spellID
 		end
-		GameTooltip:SetOwner(oldOwner)
+	end
+
+	-- Method 3: GetRotationSpells() - Returns multiple spells, first is current
+	if C_AssistedCombat.GetRotationSpells then
+		local spells = C_AssistedCombat.GetRotationSpells()
+		if spells and #spells > 0 then
+			return spells[1] -- First spell is current recommendation
+		end
 	end
 
 	return nil
@@ -252,14 +267,37 @@ SlashCmdList["ASSKEY"] = function()
 	AssKey_Settings()
 end
 
+SLASH_ASSKEYDEBUG1 = "/asskeydebug"
+SlashCmdList["ASSKEYDEBUG"] = function()
+	print("=== AssKey Debug ===")
+	print("C_AssistedCombat exists:", C_AssistedCombat ~= nil)
+	if C_AssistedCombat then
+		print("C_AssistedCombat.GetNextSpell exists:", C_AssistedCombat.GetNextSpell ~= nil)
+	end
+
+	local spellID = AssKey_GetCurrentRecommendedSpell()
+	print("GetNextSpell() returned:", spellID or "nil")
+
+	print("Assist frames found:", #AssKey.hookedFrames)
+	for frame, _ in pairs(AssKey.hookedFrames) do
+		print(" - Frame:", tostring(frame))
+	end
+end
+
+SLASH_ASSKEYAPI1 = "/asskeyapi"
+SlashCmdList["ASSKEYAPI"] = function()
+	print("=== C_AssistedCombat API ===")
+	for key, value in pairs(C_AssistedCombat) do
+		if type(value) == "function" then
+			print("  function: C_AssistedCombat." .. key)
+		else
+			print("  property: C_AssistedCombat." .. key .. " = " .. tostring(value))
+		end
+	end
+end
+
 -- ========================
 -- INITIALIZATION
 -- ========================
 AssKey:SetScript("OnEvent", AssKey.OnEvent)
 AssKey:RegisterEvent("ADDON_LOADED")
-AssKey:RegisterEvent("PLAYER_ENTERING_WORLD")
-AssKey:RegisterEvent("ASSISTED_COMBAT_ACTION_SPELL_CAST")
-AssKey:RegisterEvent("UPDATE_BINDINGS")
-AssKey:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
-AssKey:RegisterEvent("PLAYER_REGEN_ENABLED")
-AssKey:RegisterEvent("PLAYER_REGEN_DISABLED")
