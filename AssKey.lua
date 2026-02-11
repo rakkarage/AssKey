@@ -32,7 +32,7 @@ function AssKey:OnEvent(event, addonName, ...)
 	elseif event == "ASSISTED_COMBAT_ACTION_SPELL_CAST" then
 		self:UpdateAllKeybinds()
 	elseif event == "UPDATE_BINDINGS" or event == "ACTIONBAR_SLOT_CHANGED" then
-		wipe(self.keybindCache)
+		wipe(AssKey.keybindCache)
 		self:UpdateAllKeybinds()
 	elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
 		self:UpdateAllKeybinds()
