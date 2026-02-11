@@ -207,6 +207,18 @@ function AssKey_UpdateKeybindOnFrame(frame, spellID)
 		if keybind ~= "" then
 			text:SetText(keybind)
 			text:Show()
+			-- text:SetTextColor(1, 0, 0, 1)
+			-- text:SetDrawLayer("OVERLAY", 10)
+			-- text:SetFrameStrata("TOOLTIP")
+
+			-- ADD THESE DEBUG LINES:
+			print("[AssKey] TEXT SET:", keybind, "on frame:", tostring(frame))
+			print("  - Text color:", text:GetTextColor())
+			print("  - Text alpha:", text:GetAlpha())
+			print("  - Text shown:", text:IsShown())
+			print("  - Frame level:", text:GetFrameLevel())
+			print("  - Draw layer:", text:GetDrawLayer())
+
 			return
 		end
 	end
