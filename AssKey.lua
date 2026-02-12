@@ -78,27 +78,26 @@ function AssKey_GetKeybindForSpell(spellID)
 			if bindingKey then
 				return GetBindingText(bindingKey)
 			end
-			break
-
 			-- Macro on bar
 		elseif actionType == "macro" then
-			-- Try to get the spell from the macro command text
 			local macroText = GetMacroBody(id)
 			if macroText then
-				-- Look for /use [spell] or /cast [spell]
-				local useSpell = macroText:match("/use%s+([%w%s']+)")
-				if not useSpell then
-					useSpell = macroText:match("/cast%s+([%w%s']+)")
-				end
-				if useSpell then
-					local macroSpellID = select(7, GetSpellInfo(useSpell))
-					if macroSpellID == spellID then
-						local buttonNum = ((slot - 1) % 12) + 1
-						local bindingKey = GetBindingKey("ACTIONBUTTON" .. buttonNum)
-						if bindingKey then
-							return GetBindingText(bindingKey)
+				-- Look for /use or /cast commands
+				for line in macroText:gmatch("[^\r\n]+") do
+					local spellName = line:match("/use%s+([^%[%c]+)") or line:match("/cast%s+([^%[%c]+)")
+					if spellName then
+						spellName = spellName:match("^%s*(.-)%s*$") -- trim whitespace
+
+						-- Convert spell name to ID and compare
+						local macroSpellID = C_Spell.GetSpellIDForSpellIdentifier(spellName)
+						if macroSpellID == spellID then
+							local buttonNum = ((slot - 1) % 12) + 1
+							local bindingKey = GetBindingKey("ACTIONBUTTON" .. buttonNum)
+							if bindingKey then
+								return GetBindingText(bindingKey)
+							end
+							break
 						end
-						break
 					end
 				end
 			end
