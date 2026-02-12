@@ -1,43 +1,99 @@
 -- AssKey - Shows keybinds for Single Button Assistant recommendations
 -- Attaches directly to the SBA button
 
--- Initialize saved variables
-AssKeyDB = AssKeyDB or {
+AssKey = CreateFrame("Frame")
+AssKey.name = "AssKey"
+AssKey.defaults = {
 	enabled = true,
 	fontSize = 24,
 	offsetX = 0,
 	offsetY = 0,
 }
 
--- Create the keybind display frame
-local AssKey = CreateFrame("Frame", "AssKeyMainFrame", UIParent, "BackdropTemplate")
-AssKey:SetSize(200, 100)
-AssKey:SetAlpha(1.0)
-AssKey:Hide()
+-- Main frame for keybind display
+AssKey.display = CreateFrame("Frame", "AssKeyMainFrame", UIParent, "BackdropTemplate")
+AssKey.display:SetSize(200, 100)
+AssKey.display:SetAlpha(1.0)
+AssKey.display:Hide()
 
--- Add a bright background so we can SEE the frame
-AssKey:SetBackdrop({
+-- Add background for visibility
+AssKey.display:SetBackdrop({
 	bgFile = "Interface/Tooltips/UI-Tooltip-Background",
 	edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
 	edgeSize = 16,
 	insets = { left = 4, right = 4, top = 4, bottom = 4 }
 })
-AssKey:SetBackdropColor(1, 0, 0, 0.9)     -- BRIGHT RED BACKGROUND
-AssKey:SetBackdropBorderColor(1, 1, 0, 1) -- YELLOW BORDER
+AssKey.display:SetBackdropColor(1, 0, 0, 0.9)
+AssKey.display:SetBackdropBorderColor(1, 1, 0, 1)
 
--- Keybind text - HUGE
-AssKey.keybind = AssKey:CreateFontString(nil, "OVERLAY")
-AssKey.keybind:SetFont("Fonts\\FRIZQT__.TTF", 72, "THICKOUTLINE") -- GIANT TEXT
-AssKey.keybind:SetPoint("CENTER", 0, 0)
-AssKey.keybind:SetTextColor(1, 1, 1)                              -- WHITE
-AssKey.keybind:SetShadowOffset(0, 0)                              -- No shadow
-AssKey.keybind:SetAlpha(1.0)
-AssKey.keybind:SetDrawLayer("OVERLAY", 7)
+-- Keybind text
+AssKey.display.keybind = AssKey.display:CreateFontString(nil, "OVERLAY")
+AssKey.display.keybind:SetFont("Fonts\\FRIZQT__.TTF", 72, "THICKOUTLINE")
+AssKey.display.keybind:SetPoint("CENTER", 0, 0)
+AssKey.display.keybind:SetTextColor(1, 1, 1)
+AssKey.display.keybind:SetShadowOffset(0, 0)
+AssKey.display.keybind:SetAlpha(1.0)
+AssKey.display.keybind:SetDrawLayer("OVERLAY", 7)
 
--- Store the SBA overlay button
-local SBA_Overlay_Button = nil
+-- Reference to SBA overlay button
+AssKey.SBA_Overlay_Button = nil
 
--- Function to find which button has the SBA overlay active
+-- Event handling
+function AssKey:OnEvent(event, ...)
+	self[event](self, event, ...)
+end
+
+AssKey:SetScript("OnEvent", AssKey.OnEvent)
+AssKey:RegisterEvent("ADDON_LOADED")
+
+function AssKey:ADDON_LOADED(event, name)
+	if name == self.name then
+		AssKeyDB = AssKeyDB or {}
+		for key, value in pairs(self.defaults) do
+			if AssKeyDB[key] == nil then
+				AssKeyDB[key] = value
+			end
+		end
+
+		self:InitializeOptions()
+		self:InitializeUpdateLoop()
+
+		C_Timer.After(1, function()
+			AssKey:Update()
+		end)
+
+		self:UnregisterEvent(event)
+		print("AssKey loaded! Use /ak for commands or click addon compartment icon.")
+	end
+end
+
+function AssKey:InitializeUpdateLoop()
+	-- Update loop
+	C_Timer.NewTicker(0.1, function()
+		AssKey:Update()
+	end)
+
+	-- Setup display frame
+	self.display:SetParent(UIParent)
+	self.display:SetFrameStrata("TOOLTIP")
+	self.display:SetFrameLevel(9999)
+
+	-- Event handling for action bar changes
+	local eventFrame = CreateFrame("Frame")
+	eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+	eventFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
+	eventFrame:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
+	eventFrame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+	eventFrame:RegisterEvent("UPDATE_BINDINGS")
+
+	eventFrame:SetScript("OnEvent", function(self, event)
+		C_Timer.After(0.5, function()
+			AssKey:Update()
+		end)
+	end)
+end
+
 local function Find_SBA_Overlay_Button()
 	-- Look for a button with active SpellActivationAlert or children with overlay textures
 	local Frame = EnumerateFrames()
@@ -58,8 +114,26 @@ local function Find_SBA_Overlay_Button()
 	return nil
 end
 
+-- Find which button has the SBA overlay active
+function AssKey:FindSBAOverlayButton()
+	local Frame = EnumerateFrames()
+	while Frame do
+		if Frame.UpdateAssistedCombatRotationFrame then
+			for _, child in ipairs({ Frame:GetChildren() }) do
+				if child.ActiveFrame or child.InactiveTexture then
+					if child:IsShown() or (child.ActiveFrame and child.ActiveFrame:IsShown()) then
+						return Frame
+					end
+				end
+			end
+		end
+		Frame = EnumerateFrames(Frame)
+	end
+	return nil
+end
+
 -- Get keybind for a spell (works with direct spells and macros)
-function AssKey_GetKeybindForSpell(spellID)
+function AssKey:GetKeybindForSpell(spellID)
 	for slot = 1, 120 do
 		local actionType, id = GetActionInfo(slot)
 
@@ -103,7 +177,7 @@ function AssKey_GetKeybindForSpell(spellID)
 end
 
 -- Get the currently recommended spell from SBA
-function AssKey_GetCurrentRecommendedSpell()
+function AssKey:GetCurrentRecommendedSpell()
 	if not C_AssistedCombat then return nil end
 
 	-- Try GetNextCastSpell - this is what shows the current recommendation
@@ -128,111 +202,100 @@ end
 -- Update the keybind display
 function AssKey:Update()
 	if not AssKeyDB.enabled then
-		self:Hide()
+		self.display:Hide()
 		return
 	end
 
 	-- Find the button with SBA overlay
-	SBA_Overlay_Button = Find_SBA_Overlay_Button()
+	self.SBA_Overlay_Button = self:FindSBAOverlayButton()
 
-	if not SBA_Overlay_Button then
-		self:Hide()
+	if not self.SBA_Overlay_Button then
+		self.display:Hide()
 		return
 	end
 
 	-- Attach to the SBA overlay button
-	self:ClearAllPoints()
-	self:SetPoint("CENTER", SBA_Overlay_Button, "CENTER", AssKeyDB.offsetX, AssKeyDB.offsetY)
+	self.display:ClearAllPoints()
+	self.display:SetPoint("CENTER", self.SBA_Overlay_Button, "CENTER", AssKeyDB.offsetX, AssKeyDB.offsetY)
 
 	-- Get the recommended spell and find its keybind
-	local spellID = AssKey_GetCurrentRecommendedSpell()
+	local spellID = self:GetCurrentRecommendedSpell()
 	if spellID and spellID > 0 then
-		local keybind = AssKey_GetKeybindForSpell(spellID)
+		local keybind = self:GetKeybindForSpell(spellID)
 
 		if keybind and keybind ~= "" then
-			self.keybind:SetText(keybind)
-			self:Show()
+			self.display.keybind:SetText(keybind)
+			self.display:Show()
 		else
-			self:Hide()
+			self.display:Hide()
 		end
 	else
-		self:Hide()
+		self.display:Hide()
 	end
 end
 
--- Update loop
-local ticker = C_Timer.NewTicker(0.1, function()
-	AssKey:Update()
-end)
+-- Addon compartment click handler
+function AssKey_OnAddonCompartmentClick(addonName, buttonName)
+	if addonName == "AssKey" then
+		AssKey_Settings()
+	end
+end
 
--- Initial setup
-AssKey:SetParent(UIParent)
-AssKey:SetFrameStrata("TOOLTIP")
-AssKey:SetFrameLevel(9999)
+-- Settings panel opener
+function AssKey_Settings()
+	if not InCombatLockdown() then
+		Settings.OpenToCategory(AssKey.category:GetID())
+	else
+		print("AssKey: Cannot open settings while in combat!")
+	end
+end
 
--- Event handling for when SBA button might appear/change
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-eventFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
-eventFrame:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
-eventFrame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
-eventFrame:RegisterEvent("UPDATE_BINDINGS")
+-- Initialize settings panel using modern Settings API
+function AssKey:InitializeOptions()
+	local category, layout = Settings.RegisterVerticalLayoutCategory(self.name)
+	self.category = category
+	Settings.RegisterAddOnCategory(category)
 
-eventFrame:SetScript("OnEvent", function(self, event)
-	C_Timer.After(0.5, function()
-		AssKey:Update()
+	-- Enable/Disable checkbox
+	Settings.CreateCheckbox(category,
+		Settings.RegisterAddOnSetting(category, "AssKey_Enabled", "enabled", AssKeyDB, Settings.VarType.Boolean,
+			"Enable AssKey", self.defaults.enabled),
+		"Show keybind overlay on SBA button")
+
+	-- Font size slider
+	local fontSizeOptions = Settings.CreateSliderOptions(8, 72, 1)
+	fontSizeOptions:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(value)
+		return string.format("%d pt", value)
 	end)
-end)
+	Settings.CreateSlider(category,
+		Settings.RegisterAddOnSetting(category, "AssKey_FontSize", "fontSize", AssKeyDB, Settings.VarType.Number,
+			"Font Size", self.defaults.fontSize),
+		fontSizeOptions, "Size of the keybind text")
+
+	-- X Offset slider
+	local offsetXOptions = Settings.CreateSliderOptions(-200, 200, 5)
+	offsetXOptions:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(value)
+		return string.format("%d px", value)
+	end)
+	Settings.CreateSlider(category,
+		Settings.RegisterAddOnSetting(category, "AssKey_OffsetX", "offsetX", AssKeyDB, Settings.VarType.Number,
+			"Horizontal Offset", self.defaults.offsetX),
+		offsetXOptions, "Move keybind left/right")
+
+	-- Y Offset slider
+	local offsetYOptions = Settings.CreateSliderOptions(-200, 200, 5)
+	offsetYOptions:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(value)
+		return string.format("%d px", value)
+	end)
+	Settings.CreateSlider(category,
+		Settings.RegisterAddOnSetting(category, "AssKey_OffsetY", "offsetY", AssKeyDB, Settings.VarType.Number,
+			"Vertical Offset", self.defaults.offsetY),
+		offsetYOptions, "Move keybind up/down")
+end
 
 -- Slash commands
-SLASH_ASSKEY1 = "/asskey"
-SLASH_ASSKEY2 = "/ak"
-SlashCmdList["ASSKEY"] = function(msg)
-	msg = msg:lower():trim()
-
-	if msg == "toggle" or msg == "" then
-		AssKeyDB.enabled = not AssKeyDB.enabled
-		if AssKeyDB.enabled then
-			print("AssKey: Enabled")
-			AssKey:Update()
-		else
-			print("AssKey: Disabled")
-			AssKey:Hide()
-		end
-	elseif msg == "on" then
-		AssKeyDB.enabled = true
-		print("AssKey: Enabled")
-		AssKey:Update()
-	elseif msg == "off" then
-		AssKeyDB.enabled = false
-		print("AssKey: Disabled")
-		AssKey:Hide()
-	elseif msg:match("^size%s+(%d+)") then
-		local size = tonumber(msg:match("^size%s+(%d+)"))
-		if size and size >= 8 and size <= 72 then
-			AssKeyDB.fontSize = size
-			AssKey.keybind:SetFont(AssKey.keybind:GetFont(), size, "OUTLINE")
-			print("AssKey: Font size set to", size)
-			AssKey:Update()
-		else
-			print("AssKey: Invalid size. Use 8-72")
-		end
-	elseif msg:match("^offset%s+([-%d]+)%s+([-%d]+)") then
-		local x, y = msg:match("^offset%s+([-%d]+)%s+([-%d]+)")
-		AssKeyDB.offsetX = tonumber(x) or 0
-		AssKeyDB.offsetY = tonumber(y) or 0
-		SBA_Button = nil -- Force reattach
-		print("AssKey: Offset set to", AssKeyDB.offsetX, AssKeyDB.offsetY)
-		AssKey:Update()
-	else
-		print("AssKey commands:")
-		print("  /ak - Toggle on/off")
-		print("  /ak on|off - Enable/disable")
-		print("  /ak size <8-72> - Set font size")
-		print("  /ak offset <x> <y> - Adjust position")
-	end
+SLASH_ASSKEY1 = "/ak"
+SLASH_ASSKEY2 = "/asskey"
+SlashCmdList["ASSKEY"] = function(msg, editFrame, noOutput)
+	AssKey_Settings()
 end
-
--- Initial load
-print("AssKey loaded! Use /ak for commands")

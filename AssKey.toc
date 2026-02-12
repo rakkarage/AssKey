@@ -5,7 +5,7 @@
 ## Notes: Display hotkey on SingleButtonAssistant.
 ## Author: rakkarage
 ## SavedVariables: AssKeyDB
-## AddonCompartmentFunc: AssKey_AddonCompartmentClick
+## AddonCompartmentFunc: AssKey_OnAddonCompartmentClick
 ## IconTexture: Interface/AddOns/AssKey/AssKey.png
 
 AssKey.lua
