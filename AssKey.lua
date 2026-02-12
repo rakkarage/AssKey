@@ -35,8 +35,12 @@ AssKey.display.keybind:SetShadowOffset(0, 0)
 AssKey.display.keybind:SetAlpha(1.0)
 AssKey.display.keybind:SetDrawLayer("OVERLAY", 7)
 
--- Reference to SBA overlay button
-AssKey.SBA_Overlay_Button = nil
+-- Cached references and state
+AssKey.cachedSBAButton = nil
+AssKey.lastScanTime = 0
+AssKey.scanCooldown = 2.0 -- Only scan every 2 seconds max
+AssKey.hooked = false
+AssKey.pendingUpdate = false
 
 -- Event handling
 function AssKey:OnEvent(event, ...)
@@ -56,7 +60,7 @@ function AssKey:ADDON_LOADED(event, name)
 		end
 
 		self:InitializeOptions()
-		self:InitializeUpdateLoop()
+		self:InitializeEventHandlers()
 
 		C_Timer.After(1, function()
 			AssKey:Update()
@@ -67,12 +71,7 @@ function AssKey:ADDON_LOADED(event, name)
 	end
 end
 
-function AssKey:InitializeUpdateLoop()
-	-- Update loop
-	C_Timer.NewTicker(0.1, function()
-		AssKey:Update()
-	end)
-
+function AssKey:InitializeEventHandlers()
 	-- Setup display frame
 	self.display:SetParent(UIParent)
 	self.display:SetFrameStrata("TOOLTIP")
@@ -88,40 +87,62 @@ function AssKey:InitializeUpdateLoop()
 	eventFrame:RegisterEvent("UPDATE_BINDINGS")
 
 	eventFrame:SetScript("OnEvent", function(self, event)
-		C_Timer.After(0.5, function()
-			AssKey:Update()
-		end)
+		AssKey:ScheduleUpdate()
 	end)
 end
 
-local function Find_SBA_Overlay_Button()
-	-- Look for a button with active SpellActivationAlert or children with overlay textures
-	local Frame = EnumerateFrames()
-	while Frame do
-		if Frame.UpdateAssistedCombatRotationFrame then
-			-- Check if this button has active SBA children
-			for _, child in ipairs({ Frame:GetChildren() }) do
-				if child.ActiveFrame or child.InactiveTexture then
-					-- This button has SBA overlay components
-					if child:IsShown() or (child.ActiveFrame and child.ActiveFrame:IsShown()) then
-						return Frame
-					end
-				end
-			end
-		end
-		Frame = EnumerateFrames(Frame)
+-- Schedule an update with debouncing
+function AssKey:ScheduleUpdate()
+	if not AssKeyDB.enabled then return end
+
+	if not self.pendingUpdate then
+		self.pendingUpdate = true
+		C_Timer.After(0.1, function()
+			self.pendingUpdate = false
+			self:Update()
+		end)
 	end
-	return nil
 end
 
--- Find which button has the SBA overlay active
+-- Find which button has the SBA overlay active - OPTIMIZED with caching
 function AssKey:FindSBAOverlayButton()
+	-- Return cached button if it's still valid
+	if self.cachedSBAButton and self.cachedSBAButton:IsShown() then
+		-- Quick check if it still has active overlay
+		for _, child in ipairs({ self.cachedSBAButton:GetChildren() }) do
+			if child.ActiveFrame and child.ActiveFrame:IsShown() then
+				return self.cachedSBAButton
+			end
+		end
+	end
+
+	-- Throttle full scans
+	local now = GetTime()
+	if now - self.lastScanTime < self.scanCooldown then
+		return self.cachedSBAButton -- Return cached (might be nil)
+	end
+
+	self.lastScanTime = now
+
+	-- Full scan only when cache is invalid and cooldown passed
 	local Frame = EnumerateFrames()
 	while Frame do
 		if Frame.UpdateAssistedCombatRotationFrame then
 			for _, child in ipairs({ Frame:GetChildren() }) do
 				if child.ActiveFrame or child.InactiveTexture then
 					if child:IsShown() or (child.ActiveFrame and child.ActiveFrame:IsShown()) then
+						-- Cache the button we found
+						self.cachedSBAButton = Frame
+
+						-- Hook the button's update method to avoid constant polling
+						if not self.hooked then
+							hooksecurefunc(Frame, "UpdateAssistedCombatRotationFrame", function()
+								-- When SBA updates its recommendation, update our display
+								self:ScheduleUpdate()
+							end)
+							self.hooked = true
+						end
+
 						return Frame
 					end
 				end
@@ -129,6 +150,9 @@ function AssKey:FindSBAOverlayButton()
 		end
 		Frame = EnumerateFrames(Frame)
 	end
+
+	-- No button found, clear cache
+	self.cachedSBAButton = nil
 	return nil
 end
 
@@ -143,28 +167,20 @@ function AssKey:GetKeybindForSpell(spellID)
 
 			-- Map slot numbers to action bar bindings
 			if slot <= 12 then
-				-- Main action bar (bottom bar)
 				bindingKey = GetBindingKey("ACTIONBUTTON" .. slot)
 			elseif slot <= 24 then
-				-- Bottom right bar
 				bindingKey = GetBindingKey("MULTIACTIONBAR3BUTTON" .. (slot - 12))
 			elseif slot <= 36 then
-				-- Bottom left bar
 				bindingKey = GetBindingKey("MULTIACTIONBAR4BUTTON" .. (slot - 24))
 			elseif slot <= 48 then
-				-- Right bar 1
 				bindingKey = GetBindingKey("MULTIACTIONBAR1BUTTON" .. (slot - 36))
 			elseif slot <= 60 then
-				-- Right bar 2
 				bindingKey = GetBindingKey("MULTIACTIONBAR2BUTTON" .. (slot - 48))
 			elseif slot <= 72 then
-				-- Bar 6 (varies by class/spec)
 				bindingKey = GetBindingKey("MULTIACTIONBAR5BUTTON" .. (slot - 60))
 			elseif slot <= 84 then
-				-- Bar 7
 				bindingKey = GetBindingKey("MULTIACTIONBAR6BUTTON" .. (slot - 72))
 			elseif slot <= 96 then
-				-- Bar 8
 				bindingKey = GetBindingKey("MULTIACTIONBAR7BUTTON" .. (slot - 84))
 			end
 
@@ -206,17 +222,17 @@ function AssKey:Update()
 		return
 	end
 
-	-- Find the button with SBA overlay
-	self.SBA_Overlay_Button = self:FindSBAOverlayButton()
+	-- Find the button with SBA overlay (uses cache now!)
+	local button = self:FindSBAOverlayButton()
 
-	if not self.SBA_Overlay_Button then
+	if not button then
 		self.display:Hide()
 		return
 	end
 
 	-- Attach to the SBA overlay button
 	self.display:ClearAllPoints()
-	self.display:SetPoint("CENTER", self.SBA_Overlay_Button, "CENTER", AssKeyDB.offsetX, AssKeyDB.offsetY)
+	self.display:SetPoint("CENTER", button, "CENTER", AssKeyDB.offsetX, AssKeyDB.offsetY)
 
 	-- Get the recommended spell and find its keybind
 	local spellID = self:GetCurrentRecommendedSpell()
@@ -224,6 +240,10 @@ function AssKey:Update()
 		local keybind = self:GetKeybindForSpell(spellID)
 
 		if keybind and keybind ~= "" then
+			-- Update font size from settings
+			local currentFont = self.display.keybind:GetFont()
+			self.display.keybind:SetFont(currentFont, AssKeyDB.fontSize, "THICKOUTLINE")
+
 			self.display.keybind:SetText(keybind)
 			self.display:Show()
 		else
