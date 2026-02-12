@@ -71,35 +71,20 @@ function AssKey_GetKeybindForSpell(spellID)
 	for slot = 1, 120 do
 		local actionType, id = GetActionInfo(slot)
 
-		-- Direct spell on bar
-		if actionType == "spell" and id == spellID then
-			local buttonNum = ((slot - 1) % 12) + 1
-			local bindingKey = GetBindingKey("ACTIONBUTTON" .. buttonNum)
+		-- Direct spell on bar OR macro that casts this spell
+		if (actionType == "spell" or actionType == "macro") and id == spellID then
+			local bindingKey
+			if slot <= 12 then
+				bindingKey = GetBindingKey("ACTIONBUTTON" .. slot)
+			elseif slot <= 24 then
+				bindingKey = GetBindingKey("MULTIACTIONBAR3BUTTON" .. (slot - 12))
+			elseif slot <= 36 then
+				bindingKey = GetBindingKey("MULTIACTIONBAR4BUTTON" .. (slot - 24))
+				-- add more bars as needed
+			end
+
 			if bindingKey then
 				return GetBindingText(bindingKey)
-			end
-			-- Macro on bar
-		elseif actionType == "macro" then
-			local macroText = GetMacroBody(id)
-			if macroText then
-				-- Look for /use or /cast commands
-				for line in macroText:gmatch("[^\r\n]+") do
-					local spellName = line:match("/use%s+([^%[%c]+)") or line:match("/cast%s+([^%[%c]+)")
-					if spellName then
-						spellName = spellName:match("^%s*(.-)%s*$") -- trim whitespace
-
-						-- Convert spell name to ID and compare
-						local macroSpellID = C_Spell.GetSpellIDForSpellIdentifier(spellName)
-						if macroSpellID == spellID then
-							local buttonNum = ((slot - 1) % 12) + 1
-							local bindingKey = GetBindingKey("ACTIONBUTTON" .. buttonNum)
-							if bindingKey then
-								return GetBindingText(bindingKey)
-							end
-							break
-						end
-					end
-				end
 			end
 		end
 	end
@@ -126,12 +111,12 @@ function AssKey_GetCurrentRecommendedSpell()
 	end
 
 	-- Method 3: GetRotationSpells() - Returns multiple spells, first is current
-	if C_AssistedCombat.GetRotationSpells then
-		local spells = C_AssistedCombat.GetRotationSpells()
-		if spells and #spells > 0 then
-			return spells[1] -- First spell is current recommendation
-		end
-	end
+	-- if C_AssistedCombat.GetRotationSpells then
+	-- 	local spells = C_AssistedCombat.GetRotationSpells()
+	-- 	if spells and #spells > 0 then
+	-- 		return spells[1] -- First spell is current recommendation
+	-- 	end
+	-- end
 
 	return nil
 end
