@@ -93,6 +93,12 @@ end
 
 -- Find which button has the SBA overlay active - OPTIMIZED with caching
 function AssKey:FindSBAOverlayButton()
+	if not C_AssistedCombat or not C_AssistedCombat.GetNextCastSpell or
+		C_AssistedCombat.GetNextCastSpell() <= 0 then
+		self.cachedSBAButton = nil
+		return nil
+	end
+
 	-- Return cached button if it's still valid
 	if self.cachedSBAButton and self.cachedSBAButton:IsShown() then
 		-- Quick check if it still has active overlay
