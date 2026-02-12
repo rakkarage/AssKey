@@ -15,9 +15,9 @@ AssKey.display:SetSize(200, 100)
 AssKey.display:SetAlpha(1.0)
 AssKey.display:Hide()
 
--- Keybind text - THICK OUTLINE only, no background
+-- Keybind text
 AssKey.display.keybind = AssKey.display:CreateFontString(nil, "OVERLAY")
-AssKey.display.keybind:SetFont("Fonts\\FRIZQT__.TTF", 72, "THICKOUTLINE")
+AssKey.display.keybind:SetFont(GameFontNormal:GetFont(), 24, "THICKOUTLINE")
 AssKey.display.keybind:SetPoint("CENTER", 0, 0)
 AssKey.display.keybind:SetTextColor(1, 1, 1)
 AssKey.display.keybind:SetShadowOffset(0, 0)
@@ -257,8 +257,6 @@ function AssKey:InitializeOptions()
 	local category, layout = Settings.RegisterVerticalLayoutCategory(self.name)
 	self.category = category
 	Settings.RegisterAddOnCategory(category)
-
-	-- REMOVED enable/disable checkbox
 
 	-- Font size slider
 	local fontSizeOptions = Settings.CreateSliderOptions(8, 72, 1)
