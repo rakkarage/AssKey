@@ -4,29 +4,18 @@
 AssKey = CreateFrame("Frame")
 AssKey.name = "AssKey"
 AssKey.defaults = {
-	enabled = true,
 	fontSize = 24,
 	offsetX = 0,
 	offsetY = 0,
 }
 
 -- Main frame for keybind display
-AssKey.display = CreateFrame("Frame", "AssKeyMainFrame", UIParent, "BackdropTemplate")
+AssKey.display = CreateFrame("Frame", "AssKeyMainFrame", UIParent)
 AssKey.display:SetSize(200, 100)
 AssKey.display:SetAlpha(1.0)
 AssKey.display:Hide()
 
--- Add background for visibility
-AssKey.display:SetBackdrop({
-	bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-	edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-	edgeSize = 16,
-	insets = { left = 4, right = 4, top = 4, bottom = 4 }
-})
-AssKey.display:SetBackdropColor(1, 0, 0, 0.9)
-AssKey.display:SetBackdropBorderColor(1, 1, 0, 1)
-
--- Keybind text
+-- Keybind text - THICK OUTLINE only, no background
 AssKey.display.keybind = AssKey.display:CreateFontString(nil, "OVERLAY")
 AssKey.display.keybind:SetFont("Fonts\\FRIZQT__.TTF", 72, "THICKOUTLINE")
 AssKey.display.keybind:SetPoint("CENTER", 0, 0)
@@ -93,8 +82,6 @@ end
 
 -- Schedule an update with debouncing
 function AssKey:ScheduleUpdate()
-	if not AssKeyDB.enabled then return end
-
 	if not self.pendingUpdate then
 		self.pendingUpdate = true
 		C_Timer.After(0.1, function()
@@ -217,11 +204,6 @@ end
 
 -- Update the keybind display
 function AssKey:Update()
-	if not AssKeyDB.enabled then
-		self.display:Hide()
-		return
-	end
-
 	-- Find the button with SBA overlay (uses cache now!)
 	local button = self:FindSBAOverlayButton()
 
@@ -276,11 +258,7 @@ function AssKey:InitializeOptions()
 	self.category = category
 	Settings.RegisterAddOnCategory(category)
 
-	-- Enable/Disable checkbox
-	Settings.CreateCheckbox(category,
-		Settings.RegisterAddOnSetting(category, "AssKey_Enabled", "enabled", AssKeyDB, Settings.VarType.Boolean,
-			"Enable AssKey", self.defaults.enabled),
-		"Show keybind overlay on SBA button")
+	-- REMOVED enable/disable checkbox
 
 	-- Font size slider
 	local fontSizeOptions = Settings.CreateSliderOptions(8, 72, 1)
