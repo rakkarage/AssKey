@@ -4,9 +4,9 @@ AssKey.defaults = {
 	fontSize = 24,
 	offsetX = 0,
 	offsetY = 0,
-	fontColor = { a = 1, r = 1, g = 1, b = 1 },
+	fontColor = "ffffffff",
 	shadowEnabled = true,
-	shadowColor = { a = 1, r = 0, g = 0, b = 0 },
+	shadowColor = "ff000000",
 	shadowOffsetX = 1,
 	shadowOffsetY = -1,
 	outline = "THICKOUTLINE",
@@ -22,7 +22,7 @@ AssKey.keybind:SetFont(GameFontNormal:GetFont(), 24, "THICKOUTLINE")
 AssKey.keybind:SetPoint("CENTER", 0, 0)
 AssKey.keybind:SetTextColor(1, 1, 1, 1)
 AssKey.keybind:SetShadowColor(0, 0, 0, 1)
-AssKey.keybind:SetShadowOffset(1, -1)
+AssKey.keybind:SetShadowOffset(3, -3)
 AssKey.keybind:SetDrawLayer("OVERLAY", 7)
 AssKey.keybind:SetAlpha(1.0)
 
@@ -279,43 +279,23 @@ function AssKey:Update()
 	self.keybind:SetFont(fontPath, AssKeyDB.fontSize, outline)
 
 	-- Apply text color
-	local fc = AssKeyDB.fontColor
-	if type(fc) == "table" and fc.r then
-		-- Table format with r,g,b
-		self.keybind:SetTextColor(fc.r, fc.g, fc.b, fc.a)
-	elseif type(fc) == "string" then
-		-- Hex string format - convert it
-		local color = CreateColorFromHexString(fc)
-		if color then
-			self.keybind:SetTextColor(color:GetRGBA())
-		else
-			self.keybind:SetTextColor(1, 1, 1, 1) -- fallback to white
-		end
+	local color = CreateColorFromHexString(AssKeyDB.fontColor)
+	if color then
+		self.keybind:SetTextColor(color:GetRGBA())
 	else
-		self.keybind:SetTextColor(1, 1, 1, 1) -- fallback to white
+		self.keybind:SetTextColor(1, 1, 1, 1)
 	end
 
 	-- Apply shadow
 	if AssKeyDB.shadowEnabled then
-		local sc = AssKeyDB.shadowColor
-		if type(sc) == "table" and sc.r then
-			-- Table format with r,g,b
-			self.keybind:SetShadowColor(sc.r, sc.g, sc.b, sc.a)
-		elseif type(sc) == "string" then
-			-- Hex string format - convert it
-			local color = CreateColorFromHexString(sc)
-			if color then
-				self.keybind:SetShadowColor(color:GetRGBA())
-			else
-				self.keybind:SetShadowColor(0, 0, 0, 1) -- fallback to black
-			end
+		local color = CreateColorFromHexString(AssKeyDB.shadowColor)
+		if color then
+			self.keybind:SetShadowColor(color:GetRGBA())
 		else
-			self.keybind:SetShadowColor(0, 0, 0, 1) -- fallback to black
+			self.keybind:SetShadowColor(0, 0, 0, 1)
 		end
-		self.keybind:SetShadowOffset(AssKeyDB.shadowOffsetX or self.defaults.shadowOffsetX,
-			AssKeyDB.shadowOffsetY or self.defaults.shadowOffsetY)
+		self.keybind:SetShadowOffset(AssKeyDB.shadowOffsetX, AssKeyDB.shadowOffsetY)
 	else
-		-- Shadow invisible
 		self.keybind:SetShadowColor(0, 0, 0, 0)
 	end
 
