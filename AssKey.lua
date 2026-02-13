@@ -22,6 +22,11 @@ AssKey.scanCooldown = 2.0
 AssKey.hooked = false
 AssKey.pendingUpdate = false
 
+-- Reverse lookup tables
+AssKey.spellToSlot = {}   -- spellID -> slot
+AssKey.slotToBinding = {} -- slot -> keybind text
+AssKey.mapsDirty = true   -- rebuild needed?
+
 function AssKey:OnEvent(event, ...)
 	if self[event] then
 		self[event](self, event, ...)
@@ -53,6 +58,109 @@ function AssKey:ADDON_LOADED(event, name)
 	self:RegisterEvent("UPDATE_BINDINGS")
 
 	self:UnregisterEvent("ADDON_LOADED")
+
+	-- Initial build of maps
+	self.mapsDirty = true
+	self:ScheduleUpdate()
+end
+
+-- Rebuild the spell → slot and slot → binding maps
+function AssKey:BuildSpellSlotMap()
+	wipe(self.spellToSlot)
+	wipe(self.slotToBinding)
+
+	for slot = 1, 120 do
+		local actionType, id = GetActionInfo(slot)
+		if (actionType == "spell" or actionType == "macro") and id and id > 0 then
+			self.spellToSlot[id] = slot
+
+			-- Cache the keybind text for this slot
+			local bindingKey = self:GetBindingKeyForSlot(slot)
+			if bindingKey then
+				self.slotToBinding[slot] = GetBindingText(bindingKey)
+			end
+		end
+	end
+
+	self.mapsDirty = false
+end
+
+-- Extract binding key for a given slot (same logic as before)
+function AssKey:GetBindingKeyForSlot(slot)
+	if slot <= 12 then
+		return GetBindingKey("ACTIONBUTTON" .. slot)
+	elseif slot <= 24 then
+		return GetBindingKey("MULTIACTIONBAR1BUTTON" .. (slot - 12))
+	elseif slot <= 36 then
+		return GetBindingKey("MULTIACTIONBAR2BUTTON" .. (slot - 24))
+	elseif slot <= 48 then
+		return GetBindingKey("MULTIACTIONBAR4BUTTON" .. (slot - 36))
+	elseif slot <= 60 then
+		return GetBindingKey("MULTIACTIONBAR3BUTTON" .. (slot - 48))
+	elseif slot <= 72 then
+		return GetBindingKey("MULTIACTIONBAR5BUTTON" .. (slot - 60))
+	elseif slot <= 84 then
+		return GetBindingKey("MULTIACTIONBAR6BUTTON" .. (slot - 72))
+	elseif slot <= 96 then
+		return GetBindingKey("MULTIACTIONBAR7BUTTON" .. (slot - 84))
+	end
+	return nil
+end
+
+-- O(1) keybind lookup
+function AssKey:GetKeybindForSpell(spellID)
+	if self.mapsDirty then
+		self:BuildSpellSlotMap()
+	end
+
+	local slot = self.spellToSlot[spellID]
+	if not slot then return "" end
+
+	-- Return cached binding if available
+	if self.slotToBinding[slot] then
+		return self.slotToBinding[slot]
+	end
+
+	-- Fallback: get it and cache
+	local bindingKey = self:GetBindingKeyForSlot(slot)
+	if bindingKey then
+		local keyText = GetBindingText(bindingKey)
+		self.slotToBinding[slot] = keyText
+		return keyText
+	end
+
+	return ""
+end
+
+-- Event handlers – mark maps dirty and schedule update
+function AssKey:PLAYER_ENTERING_WORLD()
+	self.mapsDirty = true
+	self:ScheduleUpdate()
+end
+
+function AssKey:PLAYER_SPECIALIZATION_CHANGED()
+	self.mapsDirty = true
+	self:ScheduleUpdate()
+end
+
+function AssKey:PLAYER_TALENT_UPDATE()
+	self.mapsDirty = true
+	self:ScheduleUpdate()
+end
+
+function AssKey:UPDATE_BONUS_ACTIONBAR()
+	self.mapsDirty = true
+	self:ScheduleUpdate()
+end
+
+function AssKey:ACTIONBAR_SLOT_CHANGED()
+	self.mapsDirty = true
+	self:ScheduleUpdate()
+end
+
+function AssKey:UPDATE_BINDINGS()
+	self.mapsDirty = true
+	self:ScheduleUpdate()
 end
 
 function AssKey:ScheduleUpdate()
@@ -118,39 +226,6 @@ function AssKey:FindSBAOverlayButton()
 
 	self.cachedSBAButton = nil
 	return nil
-end
-
-function AssKey:GetKeybindForSpell(spellID)
-	for slot = 1, 120 do
-		local actionType, id = GetActionInfo(slot)
-
-		if (actionType == "spell" or actionType == "macro") and id == spellID then
-			local bindingKey
-
-			if slot <= 12 then
-				bindingKey = GetBindingKey("ACTIONBUTTON" .. slot)
-			elseif slot <= 24 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR1BUTTON" .. (slot - 12))
-			elseif slot <= 36 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR2BUTTON" .. (slot - 24))
-			elseif slot <= 48 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR4BUTTON" .. (slot - 36))
-			elseif slot <= 60 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR3BUTTON" .. (slot - 48))
-			elseif slot <= 72 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR5BUTTON" .. (slot - 60))
-			elseif slot <= 84 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR6BUTTON" .. (slot - 72))
-			elseif slot <= 96 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR7BUTTON" .. (slot - 84))
-			end
-
-			if bindingKey then
-				return GetBindingText(bindingKey)
-			end
-		end
-	end
-	return ""
 end
 
 function AssKey:GetCurrentRecommendedSpell()
