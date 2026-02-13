@@ -65,8 +65,13 @@ function AssKey:ScheduleUpdate()
 end
 
 function AssKey:FindSBAOverlayButton()
-	if not C_AssistedCombat or not C_AssistedCombat.GetNextCastSpell or
-		C_AssistedCombat.GetNextCastSpell() <= 0 then
+	if not C_AssistedCombat or not C_AssistedCombat.GetNextCastSpell then
+		self.cachedSBAButton = nil
+		return nil
+	end
+
+	local spellID = C_AssistedCombat.GetNextCastSpell()
+	if not spellID or spellID <= 0 then
 		self.cachedSBAButton = nil
 		return nil
 	end
