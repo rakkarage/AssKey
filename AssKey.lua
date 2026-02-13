@@ -19,13 +19,11 @@ AssKey.keybind:SetAlpha(1.0)
 AssKey.cachedSBAButton = nil
 AssKey.lastScanTime = 0
 AssKey.scanCooldown = 2.0
-AssKey.hooked = false
 AssKey.pendingUpdate = false
 
--- Reverse lookup tables
-AssKey.spellToSlot = {}   -- spellID -> slot
-AssKey.slotToBinding = {} -- slot -> keybind text
-AssKey.mapsDirty = true   -- rebuild needed?
+AssKey.spellToSlot = {}
+AssKey.slotToBinding = {}
+AssKey.mapsDirty = true
 
 function AssKey:OnEvent(event, ...)
 	if self[event] then
@@ -59,12 +57,10 @@ function AssKey:ADDON_LOADED(event, name)
 
 	self:UnregisterEvent("ADDON_LOADED")
 
-	-- Initial build of maps
 	self.mapsDirty = true
 	self:ScheduleUpdate()
 end
 
--- Rebuild the spell → slot and slot → binding maps
 function AssKey:BuildSpellSlotMap()
 	wipe(self.spellToSlot)
 	wipe(self.slotToBinding)
@@ -74,7 +70,6 @@ function AssKey:BuildSpellSlotMap()
 		if (actionType == "spell" or actionType == "macro") and id and id > 0 then
 			self.spellToSlot[id] = slot
 
-			-- Cache the keybind text for this slot
 			local bindingKey = self:GetBindingKeyForSlot(slot)
 			if bindingKey then
 				self.slotToBinding[slot] = GetBindingText(bindingKey)
@@ -85,29 +80,29 @@ function AssKey:BuildSpellSlotMap()
 	self.mapsDirty = false
 end
 
--- Extract binding key for a given slot (same logic as before)
 function AssKey:GetBindingKeyForSlot(slot)
 	if slot <= 12 then
 		return GetBindingKey("ACTIONBUTTON" .. slot)
 	elseif slot <= 24 then
-		return GetBindingKey("MULTIACTIONBAR1BUTTON" .. (slot - 12))
+		return GetBindingKey("ACTIONBUTTON" .. (slot - 12))
 	elseif slot <= 36 then
-		return GetBindingKey("MULTIACTIONBAR2BUTTON" .. (slot - 24))
+		return GetBindingKey("MULTIACTIONBAR3BUTTON" .. (slot - 24))
 	elseif slot <= 48 then
 		return GetBindingKey("MULTIACTIONBAR4BUTTON" .. (slot - 36))
 	elseif slot <= 60 then
-		return GetBindingKey("MULTIACTIONBAR3BUTTON" .. (slot - 48))
+		return GetBindingKey("MULTIACTIONBAR2BUTTON" .. (slot - 48))
 	elseif slot <= 72 then
-		return GetBindingKey("MULTIACTIONBAR5BUTTON" .. (slot - 60))
-	elseif slot <= 84 then
-		return GetBindingKey("MULTIACTIONBAR6BUTTON" .. (slot - 72))
-	elseif slot <= 96 then
-		return GetBindingKey("MULTIACTIONBAR7BUTTON" .. (slot - 84))
+		return GetBindingKey("MULTIACTIONBAR1BUTTON" .. (slot - 60))
+	elseif slot >= 145 and slot <= 156 then
+		return GetBindingKey("MULTIACTIONBAR5BUTTON" .. (slot - 144))
+	elseif slot >= 157 and slot <= 168 then
+		return GetBindingKey("MULTIACTIONBAR6BUTTON" .. (slot - 156))
+	elseif slot >= 169 and slot <= 180 then
+		return GetBindingKey("MULTIACTIONBAR7BUTTON" .. (slot - 168))
 	end
 	return nil
 end
 
--- O(1) keybind lookup
 function AssKey:GetKeybindForSpell(spellID)
 	if self.mapsDirty then
 		self:BuildSpellSlotMap()
@@ -116,12 +111,10 @@ function AssKey:GetKeybindForSpell(spellID)
 	local slot = self.spellToSlot[spellID]
 	if not slot then return "" end
 
-	-- Return cached binding if available
 	if self.slotToBinding[slot] then
 		return self.slotToBinding[slot]
 	end
 
-	-- Fallback: get it and cache
 	local bindingKey = self:GetBindingKeyForSlot(slot)
 	if bindingKey then
 		local keyText = GetBindingText(bindingKey)
@@ -132,7 +125,6 @@ function AssKey:GetKeybindForSpell(spellID)
 	return ""
 end
 
--- Event handlers – mark maps dirty and schedule update
 function AssKey:PLAYER_ENTERING_WORLD()
 	self.mapsDirty = true
 	self:ScheduleUpdate()
@@ -209,11 +201,12 @@ function AssKey:FindSBAOverlayButton()
 					if child:IsShown() or (child.ActiveFrame and child.ActiveFrame:IsShown()) then
 						self.cachedSBAButton = frame
 
-						if not self.hooked then
+						if not self.hookedButtons then self.hookedButtons = {} end
+						if not self.hookedButtons[frame] then
 							hooksecurefunc(frame, "UpdateAssistedCombatRotationFrame", function()
 								self:ScheduleUpdate()
 							end)
-							self.hooked = true
+							self.hookedButtons[frame] = true
 						end
 
 						return frame
