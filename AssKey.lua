@@ -125,13 +125,13 @@ function AssKey:GetKeybindForSpell(spellID)
 			if slot <= 12 then
 				bindingKey = GetBindingKey("ACTIONBUTTON" .. slot)
 			elseif slot <= 24 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR3BUTTON" .. (slot - 12))
+				bindingKey = GetBindingKey("MULTIACTIONBAR1BUTTON" .. (slot - 12))
 			elseif slot <= 36 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR4BUTTON" .. (slot - 24))
+				bindingKey = GetBindingKey("MULTIACTIONBAR2BUTTON" .. (slot - 24))
 			elseif slot <= 48 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR1BUTTON" .. (slot - 36))
+				bindingKey = GetBindingKey("MULTIACTIONBAR4BUTTON" .. (slot - 36))
 			elseif slot <= 60 then
-				bindingKey = GetBindingKey("MULTIACTIONBAR2BUTTON" .. (slot - 48))
+				bindingKey = GetBindingKey("MULTIACTIONBAR3BUTTON" .. (slot - 48))
 			elseif slot <= 72 then
 				bindingKey = GetBindingKey("MULTIACTIONBAR5BUTTON" .. (slot - 60))
 			elseif slot <= 84 then
