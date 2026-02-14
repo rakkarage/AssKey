@@ -12,7 +12,7 @@ AssKey.defaults = {
 	outline = "THICKOUTLINE",
 }
 
-AssKey:SetFrameStrata("TOOLTIP")
+AssKey:SetFrameStrata("MEDIUM")
 AssKey:SetFrameLevel(9999)
 AssKey:SetSize(50, 50)
 AssKey:Hide()
@@ -61,7 +61,7 @@ function AssKey:ADDON_LOADED(event, name)
 	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 	self:RegisterEvent("UPDATE_BINDINGS")
 
-	self:UnregisterEvent("ADDON_LOADED")
+	self:UnregisterEvent(event)
 end
 
 function AssKey:BuildSpellSlotMap()
