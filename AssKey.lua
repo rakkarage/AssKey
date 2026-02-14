@@ -78,10 +78,9 @@ function AssKey:BuildSpellSlotMap()
 	for slot = 1, 120 do
 		local actionType, id = GetActionInfo(slot)
 		if (actionType == "spell" or actionType == "macro") and id and id > 0 then
-			self.spellToSlot[id] = slot
-
 			local bindingKey = self:GetBindingKeyForSlot(slot)
-			if bindingKey then
+			if bindingKey and not self.spellToSlot[id] then
+				self.spellToSlot[id] = slot
 				self.slotToBinding[slot] = GetBindingText(bindingKey)
 			end
 		end
@@ -273,12 +272,10 @@ function AssKey:Update()
 	self:ClearAllPoints()
 	self:SetPoint("CENTER", button, "CENTER", AssKeyDB.offsetX, AssKeyDB.offsetY)
 
-	-- Apply font face, size and outline
 	local fontPath = GameFontNormal:GetFont()
 	local outline = AssKeyDB.outline or self.defaults.outline
 	self.keybind:SetFont(fontPath, AssKeyDB.fontSize, outline)
 
-	-- Apply text color
 	local color = CreateColorFromHexString(AssKeyDB.fontColor)
 	if color then
 		self.keybind:SetTextColor(color:GetRGBA())
@@ -286,7 +283,6 @@ function AssKey:Update()
 		self.keybind:SetTextColor(1, 1, 1, 1)
 	end
 
-	-- Apply shadow
 	if AssKeyDB.shadowEnabled then
 		local color = CreateColorFromHexString(AssKeyDB.shadowColor)
 		if color then
@@ -299,14 +295,12 @@ function AssKey:Update()
 		self.keybind:SetShadowColor(0, 0, 0, 0)
 	end
 
+	-- forces update shadow by change text
 	self.keybind:SetText("")
 	self.keybind:SetText(keybind)
 	self:Show()
 end
 
--------------------------------------------------------------------------------
--- Options GUI (Modern Callback System)
--------------------------------------------------------------------------------
 function AssKey:InitializeOptions()
 	local category = Settings.RegisterVerticalLayoutCategory(self.name)
 	self.category = category
@@ -316,9 +310,6 @@ function AssKey:InitializeOptions()
 		self:ScheduleUpdate()
 	end
 
-	-----------------------------------------------------------------------
-	-- Font Size & Positioning
-	-----------------------------------------------------------------------
 	local fontSizeSetting = Settings.RegisterAddOnSetting(category, "AssKey_FontSize", "fontSize", AssKeyDB,
 		Settings.VarType.Number, "Font Size", self.defaults.fontSize)
 	fontSizeSetting:SetValueChangedCallback(OnSettingChanged)
@@ -333,17 +324,6 @@ function AssKey:InitializeOptions()
 		Settings.VarType.Number, "Vertical Offset", self.defaults.offsetY)
 	offsetYSetting:SetValueChangedCallback(OnSettingChanged)
 	Settings.CreateSlider(category, offsetYSetting, Settings.CreateSliderOptions(-200, 200, 5))
-
-	-----------------------------------------------------------------------
-	-- Colors & Outline
-	-----------------------------------------------------------------------
-	-- Convert table colors to hex strings for Settings API
-	if type(AssKeyDB.fontColor) == "table" then
-		local color = CreateColor(AssKeyDB.fontColor.r, AssKeyDB.fontColor.g, AssKeyDB.fontColor.b, AssKeyDB.fontColor.a)
-		AssKeyDB.fontColor = color:GenerateHexColor()
-	elseif type(AssKeyDB.fontColor) ~= "string" then
-		AssKeyDB.fontColor = "ffffffff" -- white
-	end
 
 	local fontColorSetting = Settings.RegisterAddOnSetting(category, "AssKey_FontColor", "fontColor", AssKeyDB,
 		Settings.VarType.Color, "Font Color", "ffffffff")
@@ -363,35 +343,21 @@ function AssKey:InitializeOptions()
 		return container:GetData()
 	end)
 
-	-----------------------------------------------------------------------
-	-- Shadow Settings (Fixed Toggle + Added Offsets)
-	-----------------------------------------------------------------------
 	local shadowEnabledSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowEnabled", "shadowEnabled",
 		AssKeyDB, Settings.VarType.Boolean, "Enable Shadow", self.defaults.shadowEnabled)
 	shadowEnabledSetting:SetValueChangedCallback(OnSettingChanged)
 	Settings.CreateCheckbox(category, shadowEnabledSetting)
-
-	-- Convert table colors to hex strings for Settings API
-	if type(AssKeyDB.shadowColor) == "table" then
-		local color = CreateColor(AssKeyDB.shadowColor.r, AssKeyDB.shadowColor.g, AssKeyDB.shadowColor.b,
-			AssKeyDB.shadowColor.a)
-		AssKeyDB.shadowColor = color:GenerateHexColor()
-	elseif type(AssKeyDB.shadowColor) ~= "string" then
-		AssKeyDB.shadowColor = "ff000000" -- black
-	end
 
 	local shadowColorSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowColor", "shadowColor", AssKeyDB,
 		Settings.VarType.Color, "Shadow Color", "ff000000")
 	shadowColorSetting:SetValueChangedCallback(OnSettingChanged)
 	Settings.CreateColorSwatch(category, shadowColorSetting)
 
-	-- Missing Offset X Slider
 	local shadowOffsetXSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowOffsetX", "shadowOffsetX",
 		AssKeyDB, Settings.VarType.Number, "Shadow Offset X", self.defaults.shadowOffsetX or 1)
 	shadowOffsetXSetting:SetValueChangedCallback(OnSettingChanged)
 	Settings.CreateSlider(category, shadowOffsetXSetting, Settings.CreateSliderOptions(-20, 20, 1))
 
-	-- Missing Offset Y Slider
 	local shadowOffsetYSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowOffsetY", "shadowOffsetY",
 		AssKeyDB, Settings.VarType.Number, "Shadow Offset Y", self.defaults.shadowOffsetY or -1)
 	shadowOffsetYSetting:SetValueChangedCallback(OnSettingChanged)
@@ -400,9 +366,6 @@ function AssKey:InitializeOptions()
 	Settings.RegisterAddOnCategory(category)
 end
 
--------------------------------------------------------------------------------
--- Slash commands and Addon Compartment
--------------------------------------------------------------------------------
 SLASH_ASSKEY1 = "/ak"
 SLASH_ASSKEY2 = "/asskey"
 
