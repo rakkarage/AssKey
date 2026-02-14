@@ -195,13 +195,6 @@ function AssKey:GetCurrentRecommendedSpell()
 		end
 	end
 
-	if C_AssistedCombat.GetRotationSpells then
-		local spells = C_AssistedCombat.GetRotationSpells()
-		if spells and #spells > 0 then
-			return spells[1]
-		end
-	end
-
 	return nil
 end
 
