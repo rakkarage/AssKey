@@ -18,13 +18,8 @@ AssKey:SetSize(50, 50)
 AssKey:Hide()
 
 AssKey.keybind = AssKey:CreateFontString(nil, "OVERLAY")
-AssKey.keybind:SetFont(GameFontNormal:GetFont(), 24, "THICKOUTLINE")
 AssKey.keybind:SetPoint("CENTER", 0, 0)
-AssKey.keybind:SetTextColor(1, 1, 1, 1)
-AssKey.keybind:SetShadowColor(0, 0, 0, 1)
-AssKey.keybind:SetShadowOffset(3, -3)
 AssKey.keybind:SetDrawLayer("OVERLAY", 7)
-AssKey.keybind:SetAlpha(1.0)
 
 AssKey.cachedSBAButton = nil
 AssKey.lastScanTime = 0
@@ -39,6 +34,7 @@ function AssKey:OnEvent(event, ...)
 	if self[event] then
 		self[event](self, event, ...)
 	else
+		self.mapsDirty = true
 		self:ScheduleUpdate()
 	end
 end
@@ -66,9 +62,6 @@ function AssKey:ADDON_LOADED(event, name)
 	self:RegisterEvent("UPDATE_BINDINGS")
 
 	self:UnregisterEvent("ADDON_LOADED")
-
-	self.mapsDirty = true
-	self:ScheduleUpdate()
 end
 
 function AssKey:BuildSpellSlotMap()
@@ -113,55 +106,17 @@ function AssKey:GetBindingKeyForSlot(slot)
 end
 
 function AssKey:GetKeybindForSpell(spellID)
-	if self.mapsDirty then
-		self:BuildSpellSlotMap()
-	end
+	if self.mapsDirty then self:BuildSpellSlotMap() end
 
 	local slot = self.spellToSlot[spellID]
 	if not slot then return "" end
 
-	if self.slotToBinding[slot] then
-		return self.slotToBinding[slot]
+	if not self.slotToBinding[slot] then
+		local bindingKey = self:GetBindingKeyForSlot(slot)
+		self.slotToBinding[slot] = bindingKey and GetBindingText(bindingKey) or ""
 	end
 
-	local bindingKey = self:GetBindingKeyForSlot(slot)
-	if bindingKey then
-		local keyText = GetBindingText(bindingKey)
-		self.slotToBinding[slot] = keyText
-		return keyText
-	end
-
-	return ""
-end
-
-function AssKey:PLAYER_ENTERING_WORLD()
-	self.mapsDirty = true
-	self:ScheduleUpdate()
-end
-
-function AssKey:PLAYER_SPECIALIZATION_CHANGED()
-	self.mapsDirty = true
-	self:ScheduleUpdate()
-end
-
-function AssKey:PLAYER_TALENT_UPDATE()
-	self.mapsDirty = true
-	self:ScheduleUpdate()
-end
-
-function AssKey:UPDATE_BONUS_ACTIONBAR()
-	self.mapsDirty = true
-	self:ScheduleUpdate()
-end
-
-function AssKey:ACTIONBAR_SLOT_CHANGED()
-	self.mapsDirty = true
-	self:ScheduleUpdate()
-end
-
-function AssKey:UPDATE_BINDINGS()
-	self.mapsDirty = true
-	self:ScheduleUpdate()
+	return self.slotToBinding[slot]
 end
 
 function AssKey:ScheduleUpdate()
@@ -305,7 +260,6 @@ function AssKey:InitializeOptions()
 	local category = Settings.RegisterVerticalLayoutCategory(self.name)
 	self.category = category
 
-	-- Refresh the keybind display when ANY setting changes
 	local function OnSettingChanged()
 		self:ScheduleUpdate()
 	end
@@ -326,7 +280,7 @@ function AssKey:InitializeOptions()
 	Settings.CreateSlider(category, offsetYSetting, Settings.CreateSliderOptions(-200, 200, 5))
 
 	local fontColorSetting = Settings.RegisterAddOnSetting(category, "AssKey_FontColor", "fontColor", AssKeyDB,
-		Settings.VarType.Color, "Font Color", "ffffffff")
+		Settings.VarType.Color, "Font Color", self.defaults.fontColor)
 	fontColorSetting:SetValueChangedCallback(OnSettingChanged)
 	Settings.CreateColorSwatch(category, fontColorSetting)
 
@@ -349,17 +303,17 @@ function AssKey:InitializeOptions()
 	Settings.CreateCheckbox(category, shadowEnabledSetting)
 
 	local shadowColorSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowColor", "shadowColor", AssKeyDB,
-		Settings.VarType.Color, "Shadow Color", "ff000000")
+		Settings.VarType.Color, "Shadow Color", self.defaults.shadowColor)
 	shadowColorSetting:SetValueChangedCallback(OnSettingChanged)
 	Settings.CreateColorSwatch(category, shadowColorSetting)
 
 	local shadowOffsetXSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowOffsetX", "shadowOffsetX",
-		AssKeyDB, Settings.VarType.Number, "Shadow Offset X", self.defaults.shadowOffsetX or 1)
+		AssKeyDB, Settings.VarType.Number, "Shadow Offset X", self.defaults.shadowOffsetX)
 	shadowOffsetXSetting:SetValueChangedCallback(OnSettingChanged)
 	Settings.CreateSlider(category, shadowOffsetXSetting, Settings.CreateSliderOptions(-20, 20, 1))
 
 	local shadowOffsetYSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowOffsetY", "shadowOffsetY",
-		AssKeyDB, Settings.VarType.Number, "Shadow Offset Y", self.defaults.shadowOffsetY or -1)
+		AssKeyDB, Settings.VarType.Number, "Shadow Offset Y", self.defaults.shadowOffsetY)
 	shadowOffsetYSetting:SetValueChangedCallback(OnSettingChanged)
 	Settings.CreateSlider(category, shadowOffsetYSetting, Settings.CreateSliderOptions(-20, 20, 1))
 
@@ -380,7 +334,7 @@ function AssKey_Settings()
 end
 
 function AssKey_OnAddonCompartmentClick(addonName)
-	if addonName == "AssKey" then
+	if addonName == AssKey.name then
 		AssKey_Settings()
 	end
 end
