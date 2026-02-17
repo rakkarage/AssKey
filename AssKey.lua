@@ -316,9 +316,7 @@ end
 SLASH_ASSKEY1 = "/ak"
 SLASH_ASSKEY2 = "/asskey"
 
-SlashCmdList["ASSKEY"] = function()
-	AssKey_Settings()
-end
+SlashCmdList["ASSKEY"] = AssKey_Settings
 
 function AssKey_Settings()
 	if not InCombatLockdown() then
