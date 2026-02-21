@@ -313,11 +313,6 @@ function AssKey:InitializeOptions()
 	Settings.RegisterAddOnCategory(category)
 end
 
-SLASH_ASSKEY1 = "/ak"
-SLASH_ASSKEY2 = "/asskey"
-
-SlashCmdList["ASSKEY"] = AssKey_Settings
-
 function AssKey_Settings()
 	if not InCombatLockdown() then
 		Settings.OpenToCategory(AssKey.category:GetID())
@@ -329,3 +324,8 @@ function AssKey_OnAddonCompartmentClick(addonName)
 		AssKey_Settings()
 	end
 end
+
+SLASH_ASSKEY1 = "/ak"
+SLASH_ASSKEY2 = "/asskey"
+SlashCmdList["ASSKEY"] = AssKey_Settings
+
