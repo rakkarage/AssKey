@@ -33,9 +33,6 @@ AssKey.mapsDirty = true
 function AssKey:OnEvent(event, ...)
 	if self[event] then
 		self[event](self, event, ...)
-	else
-		self.mapsDirty = true
-		self:ScheduleUpdate()
 	end
 end
 
@@ -200,7 +197,7 @@ end
 
 function AssKey:Update()
 	local button = self:FindSBAOverlayButton()
-	if not button then
+	if not button or not button:IsShown() then
 		self:Hide()
 		return
 	end
@@ -328,4 +325,3 @@ end
 SLASH_ASSKEY1 = "/ak"
 SLASH_ASSKEY2 = "/asskey"
 SlashCmdList["ASSKEY"] = AssKey_Settings
-
