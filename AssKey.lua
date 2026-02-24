@@ -33,6 +33,9 @@ AssKey.mapsDirty = true
 function AssKey:OnEvent(event, ...)
 	if self[event] then
 		self[event](self, event, ...)
+	else
+		self.mapsDirty = true
+		self:ScheduleUpdate()
 	end
 end
 
