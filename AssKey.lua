@@ -74,7 +74,7 @@ function AssKey:BuildSpellSlotMap()
 			local bindingKey = self:GetBindingKeyForSlot(slot)
 			if bindingKey and not self.spellToSlot[id] then
 				self.spellToSlot[id] = slot
-				self.slotToBinding[slot] = GetBindingText(bindingKey)
+				self.slotToBinding[slot] = GetBindingText(bindingKey, "KEY_", true)
 			end
 		end
 	end
@@ -113,7 +113,7 @@ function AssKey:GetKeybindForSpell(spellID)
 
 	if not self.slotToBinding[slot] then
 		local bindingKey = self:GetBindingKeyForSlot(slot)
-		self.slotToBinding[slot] = bindingKey and GetBindingText(bindingKey) or ""
+		self.slotToBinding[slot] = bindingKey and GetBindingText(bindingKey, "KEY_", true) or ""
 	end
 
 	return self.slotToBinding[slot]
