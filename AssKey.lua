@@ -10,6 +10,7 @@ AssKey.defaults = {
 	shadowOffsetX = 1,
 	shadowOffsetY = -1,
 	outline = "THICKOUTLINE",
+	justifyH = "CENTER",
 }
 
 AssKey:SetFrameStrata("MEDIUM")
@@ -74,12 +75,18 @@ function AssKey:BuildSpellSlotMap()
 			local bindingKey = self:GetBindingKeyForSlot(slot)
 			if bindingKey and not self.spellToSlot[id] then
 				self.spellToSlot[id] = slot
-				self.slotToBinding[slot] = GetBindingText(bindingKey, "KEY_", true)
+				self.slotToBinding[slot] = self:AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true))
 			end
 		end
 	end
 
 	self.mapsDirty = false
+end
+
+function AssKey:AbbreviateBinding(binding)
+	if not binding then return binding end
+	binding = binding:gsub("Mouse Button (%d+)", "M%1")
+	return binding
 end
 
 function AssKey:GetBindingKeyForSlot(slot)
@@ -113,7 +120,7 @@ function AssKey:GetKeybindForSpell(spellID)
 
 	if not self.slotToBinding[slot] then
 		local bindingKey = self:GetBindingKeyForSlot(slot)
-		self.slotToBinding[slot] = bindingKey and GetBindingText(bindingKey, "KEY_", true) or ""
+		self.slotToBinding[slot] = bindingKey and self:AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true)) or ""
 	end
 
 	return self.slotToBinding[slot]
@@ -224,6 +231,11 @@ function AssKey:Update()
 	local outline = AssKeyDB.outline or self.defaults.outline
 	self.keybind:SetFont(fontPath, AssKeyDB.fontSize, outline)
 
+	local justify = AssKeyDB.justifyH or self.defaults.justifyH
+	self.keybind:SetJustifyH(justify)
+	self.keybind:ClearAllPoints()
+	self.keybind:SetPoint(justify, self, justify, 0, 0)
+
 	local color = CreateColorFromHexString(AssKeyDB.fontColor)
 	if color then
 		self.keybind:SetTextColor(color:GetRGBA())
@@ -271,6 +283,17 @@ function AssKey:InitializeOptions()
 		Settings.VarType.Number, "Vertical Offset", self.defaults.offsetY)
 	offsetYSetting:SetValueChangedCallback(OnSettingChanged)
 	Settings.CreateSlider(category, offsetYSetting, Settings.CreateSliderOptions(-200, 200, 5))
+
+	local justifyHSetting = Settings.RegisterAddOnSetting(category, "AssKey_JustifyH", "justifyH", AssKeyDB,
+		Settings.VarType.String, "Text Alignment", self.defaults.justifyH)
+	justifyHSetting:SetValueChangedCallback(OnSettingChanged)
+	Settings.CreateDropdown(category, justifyHSetting, function()
+		local container = Settings.CreateControlTextContainer()
+		container:Add("LEFT", "Left")
+		container:Add("CENTER", "Center")
+		container:Add("RIGHT", "Right")
+		return container:GetData()
+	end)
 
 	local fontColorSetting = Settings.RegisterAddOnSetting(category, "AssKey_FontColor", "fontColor", AssKeyDB,
 		Settings.VarType.Color, "Font Color", self.defaults.fontColor)
