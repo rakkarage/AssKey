@@ -11,6 +11,7 @@ AssKey.defaults = {
 	shadowOffsetY = -1,
 	outline = "THICKOUTLINE",
 	justifyH = "CENTER",
+	justifyV = "MIDDLE",
 }
 
 AssKey:SetFrameStrata("MEDIUM")
@@ -205,6 +206,22 @@ function AssKey:GetCurrentRecommendedSpell()
 	return nil
 end
 
+-- Combine justifyH (LEFT/CENTER/RIGHT) and justifyV (TOP/MIDDLE/BOTTOM)
+-- into a WoW anchor point string e.g. "TOPLEFT", "CENTER", "BOTTOMRIGHT"
+function AssKey:GetAnchorPoint()
+	local h = AssKeyDB.justifyH or self.defaults.justifyH
+	local v = AssKeyDB.justifyV or self.defaults.justifyV
+	if v == "MIDDLE" and h == "CENTER" then
+		return "CENTER"
+	elseif v == "MIDDLE" then
+		return h
+	elseif h == "CENTER" then
+		return v
+	else
+		return v .. h -- e.g. "TOP" .. "LEFT" = "TOPLEFT"
+	end
+end
+
 function AssKey:Update()
 	local button = self:FindSBAOverlayButton()
 	if not button or not button:IsShown() then
@@ -224,17 +241,20 @@ function AssKey:Update()
 		return
 	end
 
+	local anchor = self:GetAnchorPoint()
 	self:ClearAllPoints()
-	self:SetPoint("CENTER", button, "CENTER", AssKeyDB.offsetX, AssKeyDB.offsetY)
+	self:SetPoint(anchor, button, anchor, AssKeyDB.offsetX, AssKeyDB.offsetY)
 
 	local fontPath = GameFontNormal:GetFont()
 	local outline = AssKeyDB.outline or self.defaults.outline
 	self.keybind:SetFont(fontPath, AssKeyDB.fontSize, outline)
 
-	local justify = AssKeyDB.justifyH or self.defaults.justifyH
-	self.keybind:SetJustifyH(justify)
+	local h = AssKeyDB.justifyH or self.defaults.justifyH
+	local v = AssKeyDB.justifyV or self.defaults.justifyV
+	self.keybind:SetJustifyH(h)
+	self.keybind:SetJustifyV(v)
 	self.keybind:ClearAllPoints()
-	self.keybind:SetPoint(justify, self, justify, 0, 0)
+	self.keybind:SetPoint(anchor, self, anchor, 0, 0)
 
 	local color = CreateColorFromHexString(AssKeyDB.fontColor)
 	if color then
@@ -285,13 +305,24 @@ function AssKey:InitializeOptions()
 	Settings.CreateSlider(category, offsetYSetting, Settings.CreateSliderOptions(-200, 200, 5))
 
 	local justifyHSetting = Settings.RegisterAddOnSetting(category, "AssKey_JustifyH", "justifyH", AssKeyDB,
-		Settings.VarType.String, "Text Alignment", self.defaults.justifyH)
+		Settings.VarType.String, "Horizontal Alignment", self.defaults.justifyH)
 	justifyHSetting:SetValueChangedCallback(OnSettingChanged)
 	Settings.CreateDropdown(category, justifyHSetting, function()
 		local container = Settings.CreateControlTextContainer()
 		container:Add("LEFT", "Left")
 		container:Add("CENTER", "Center")
 		container:Add("RIGHT", "Right")
+		return container:GetData()
+	end)
+
+	local justifyVSetting = Settings.RegisterAddOnSetting(category, "AssKey_JustifyV", "justifyV", AssKeyDB,
+		Settings.VarType.String, "Vertical Alignment", self.defaults.justifyV)
+	justifyVSetting:SetValueChangedCallback(OnSettingChanged)
+	Settings.CreateDropdown(category, justifyVSetting, function()
+		local container = Settings.CreateControlTextContainer()
+		container:Add("TOP", "Top")
+		container:Add("MIDDLE", "Middle")
+		container:Add("BOTTOM", "Bottom")
 		return container:GetData()
 	end)
 
