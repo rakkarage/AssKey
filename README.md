@@ -8,7 +8,7 @@ Single Button Assistant shows a static keybind to invoke the Single Button Assis
 
 ## Solution
 
-- Show dynamic recommended keybinds on Single Button Assistant
+Show dynamic recommended keybinds on Single Button Assistant
 
 ## Usage
 
