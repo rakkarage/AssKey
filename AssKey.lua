@@ -90,6 +90,9 @@ function AssKey:AbbreviateBinding(binding)
 	return binding
 end
 
+-- Slots 73–144 are legacy stance-bar pages (73–120) and possess/vehicle bars
+-- (121–144). Stance paging was removed in Legion (7.0.3); possess bars are
+-- read-only system slots. Neither range has player-assignable bindings.
 function AssKey:GetBindingKeyForSlot(slot)
 	if slot <= 12 then
 		return GetBindingKey("ACTIONBUTTON" .. slot)
@@ -148,18 +151,18 @@ function AssKey:FindSBAOverlayButton()
 		return nil
 	end
 
+	-- Button is still alive and visible — reference is valid, return it.
+	-- Whether a spell is actively recommended is GetCurrentRecommendedSpell's job.
 	if self.cachedSBAButton and self.cachedSBAButton:IsShown() then
-		for i = 1, self.cachedSBAButton:GetNumChildren() do
-			local child = select(i, self.cachedSBAButton:GetChildren())
-			if child.ActiveFrame and child.ActiveFrame:IsShown() then
-				return self.cachedSBAButton
-			end
-		end
+		return self.cachedSBAButton
 	end
+
+	-- No valid cache, respect cooldown before scanning
+	self.cachedSBAButton = nil
 
 	local now = GetTime()
 	if now - self.lastScanTime < self.scanCooldown then
-		return self.cachedSBAButton
+		return nil
 	end
 
 	self.lastScanTime = now
