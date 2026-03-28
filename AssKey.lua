@@ -376,12 +376,6 @@ function AssKey_Settings()
 	end
 end
 
-function AssKey_OnAddonCompartmentClick(addonName)
-	if addonName == AssKey.name then
-		AssKey_Settings()
-	end
-end
-
 SLASH_ASSKEY1 = "/ak"
 SLASH_ASSKEY2 = "/asskey"
 SlashCmdList["ASSKEY"] = AssKey_Settings
