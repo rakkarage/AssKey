@@ -1,5 +1,5 @@
 AssKey = CreateFrame("Frame", "AssKeyFrame", UIParent)
-AssKey.name = "AssKey"
+AssKey.name = ...
 AssKey.defaults = {
 	fontSize = 24,
 	offsetX = 0,
