@@ -7,9 +7,9 @@ AssKey.defaults = {
 	fontColor = "ffffffff",
 	shadowEnabled = true,
 	shadowColor = "ff000000",
-	shadowOffsetX = 1,
-	shadowOffsetY = -1,
-	outline = "THICKOUTLINE",
+	shadowOffsetX = 3,
+	shadowOffsetY = -3,
+	outline = "",
 	justifyH = "CENTER",
 	justifyV = "MIDDLE",
 }
@@ -292,20 +292,26 @@ function AssKey:InitializeOptions()
 		self:ScheduleUpdate()
 	end
 
+	local function CreateSliderWithValue(setting, min, max, step, tooltip)
+		local options = Settings.CreateSliderOptions(min, max, step)
+		options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right)
+		Settings.CreateSlider(category, setting, options, tooltip)
+	end
+
 	local fontSizeSetting = Settings.RegisterAddOnSetting(category, "AssKey_FontSize", "fontSize", AssKeyDB,
 		Settings.VarType.Number, "Font Size", self.defaults.fontSize)
 	fontSizeSetting:SetValueChangedCallback(OnSettingChanged)
-	Settings.CreateSlider(category, fontSizeSetting, Settings.CreateSliderOptions(8, 72, 1))
+	CreateSliderWithValue(fontSizeSetting, 8, 72, 1, "Font size of the keybind text.")
 
 	local offsetXSetting = Settings.RegisterAddOnSetting(category, "AssKey_OffsetX", "offsetX", AssKeyDB,
 		Settings.VarType.Number, "Horizontal Offset", self.defaults.offsetX)
 	offsetXSetting:SetValueChangedCallback(OnSettingChanged)
-	Settings.CreateSlider(category, offsetXSetting, Settings.CreateSliderOptions(-200, 200, 5))
+	CreateSliderWithValue(offsetXSetting, -200, 200, 5, "Horizontal position relative to the SBA button.")
 
 	local offsetYSetting = Settings.RegisterAddOnSetting(category, "AssKey_OffsetY", "offsetY", AssKeyDB,
 		Settings.VarType.Number, "Vertical Offset", self.defaults.offsetY)
 	offsetYSetting:SetValueChangedCallback(OnSettingChanged)
-	Settings.CreateSlider(category, offsetYSetting, Settings.CreateSliderOptions(-200, 200, 5))
+	CreateSliderWithValue(offsetYSetting, -200, 200, 5, "Vertical position relative to the SBA button.")
 
 	local justifyHSetting = Settings.RegisterAddOnSetting(category, "AssKey_JustifyH", "justifyH", AssKeyDB,
 		Settings.VarType.String, "Horizontal Alignment", self.defaults.justifyH)
@@ -316,7 +322,7 @@ function AssKey:InitializeOptions()
 		container:Add("CENTER", "Center")
 		container:Add("RIGHT", "Right")
 		return container:GetData()
-	end)
+	end, "Horizontal anchor point on the SBA button.")
 
 	local justifyVSetting = Settings.RegisterAddOnSetting(category, "AssKey_JustifyV", "justifyV", AssKeyDB,
 		Settings.VarType.String, "Vertical Alignment", self.defaults.justifyV)
@@ -327,12 +333,12 @@ function AssKey:InitializeOptions()
 		container:Add("MIDDLE", "Middle")
 		container:Add("BOTTOM", "Bottom")
 		return container:GetData()
-	end)
+	end, "Vertical anchor point on the SBA button.")
 
 	local fontColorSetting = Settings.RegisterAddOnSetting(category, "AssKey_FontColor", "fontColor", AssKeyDB,
 		Settings.VarType.Color, "Font Color", self.defaults.fontColor)
 	fontColorSetting:SetValueChangedCallback(OnSettingChanged)
-	Settings.CreateColorSwatch(category, fontColorSetting)
+	Settings.CreateColorSwatch(category, fontColorSetting, "Color of the keybind text.")
 
 	local outlineSetting = Settings.RegisterAddOnSetting(category, "AssKey_Outline", "outline", AssKeyDB,
 		Settings.VarType.String, "Outline Style", self.defaults.outline)
@@ -345,27 +351,27 @@ function AssKey:InitializeOptions()
 		container:Add("MONOCHROME", "Monochrome")
 		container:Add("OUTLINE,MONOCHROME", "Outline + Monochrome")
 		return container:GetData()
-	end)
+	end, "Outline drawn around the keybind text.")
 
 	local shadowEnabledSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowEnabled", "shadowEnabled",
 		AssKeyDB, Settings.VarType.Boolean, "Enable Shadow", self.defaults.shadowEnabled)
 	shadowEnabledSetting:SetValueChangedCallback(OnSettingChanged)
-	Settings.CreateCheckbox(category, shadowEnabledSetting)
+	Settings.CreateCheckbox(category, shadowEnabledSetting, "Toggle display of shadow.")
 
 	local shadowColorSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowColor", "shadowColor", AssKeyDB,
 		Settings.VarType.Color, "Shadow Color", self.defaults.shadowColor)
 	shadowColorSetting:SetValueChangedCallback(OnSettingChanged)
-	Settings.CreateColorSwatch(category, shadowColorSetting)
+	Settings.CreateColorSwatch(category, shadowColorSetting, "Color of the shadow behind the text.")
 
 	local shadowOffsetXSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowOffsetX", "shadowOffsetX",
 		AssKeyDB, Settings.VarType.Number, "Shadow Offset X", self.defaults.shadowOffsetX)
 	shadowOffsetXSetting:SetValueChangedCallback(OnSettingChanged)
-	Settings.CreateSlider(category, shadowOffsetXSetting, Settings.CreateSliderOptions(-20, 20, 1))
+	CreateSliderWithValue(shadowOffsetXSetting, -20, 20, 1, "Horizontal position of the shadow.")
 
 	local shadowOffsetYSetting = Settings.RegisterAddOnSetting(category, "AssKey_ShadowOffsetY", "shadowOffsetY",
 		AssKeyDB, Settings.VarType.Number, "Shadow Offset Y", self.defaults.shadowOffsetY)
 	shadowOffsetYSetting:SetValueChangedCallback(OnSettingChanged)
-	Settings.CreateSlider(category, shadowOffsetYSetting, Settings.CreateSliderOptions(-20, 20, 1))
+	CreateSliderWithValue(shadowOffsetYSetting, -20, 20, 1, "Vertical position of the shadow.")
 
 	Settings.RegisterAddOnCategory(category)
 end
