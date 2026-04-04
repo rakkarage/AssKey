@@ -267,9 +267,9 @@ function AssKey:Update()
 	end
 
 	if AssKeyDB.shadowEnabled then
-		local color = CreateColorFromHexString(AssKeyDB.shadowColor)
-		if color then
-			self.keybind:SetShadowColor(color:GetRGBA())
+		local shadowColor = CreateColorFromHexString(AssKeyDB.shadowColor)
+		if shadowColor then
+			self.keybind:SetShadowColor(shadowColor:GetRGBA())
 		else
 			self.keybind:SetShadowColor(0, 0, 0, 1)
 		end
