@@ -28,6 +28,7 @@ AssKey.spellToSlot = {}
 AssKey.slotToBinding = {}
 AssKey.mapsDirty = true
 AssKey.hookedButtons = nil
+AssKey.needsImmediateRescan = false
 
 AssKey:SetFrameStrata("MEDIUM")
 AssKey:SetFrameLevel(9999)
@@ -38,6 +39,19 @@ AssKey.keybind = AssKey:CreateFontString(nil, "OVERLAY")
 AssKey.keybind:SetPoint("CENTER", 0, 0)
 AssKey.keybind:SetDrawLayer("OVERLAY", 7)
 
+-- Table-driven action bar slot mapping: { slotMin, slotMax, bindingFormat, slotOffset }
+local ACTIONBAR_SLOT_MAPPING = {
+	{ 1,   12,  "ACTIONBUTTON%d",          0 },
+	{ 13,  24,  "ACTIONBUTTON%d",          -12 },
+	{ 25,  36,  "MULTIACTIONBAR3BUTTON%d", -24 },
+	{ 37,  48,  "MULTIACTIONBAR4BUTTON%d", -36 },
+	{ 49,  60,  "MULTIACTIONBAR2BUTTON%d", -48 },
+	{ 61,  72,  "MULTIACTIONBAR1BUTTON%d", -60 },
+	{ 145, 156, "MULTIACTIONBAR5BUTTON%d", -144 },
+	{ 157, 168, "MULTIACTIONBAR6BUTTON%d", -156 },
+	{ 169, 180, "MULTIACTIONBAR7BUTTON%d", -168 },
+}
+
 local function AbbreviateBinding(binding)
 	if not binding then return binding end
 	binding = binding:gsub("Mouse Button (%d+)", "M%1")
@@ -45,25 +59,12 @@ local function AbbreviateBinding(binding)
 end
 
 local function GetBindingKeyForSlot(slot)
-	-- Slots 73–144 are legacy stance-bar pages (73–120) and possess/vehicle bars
-	if slot <= 12 then
-		return GetBindingKey("ACTIONBUTTON" .. slot)
-	elseif slot <= 24 then
-		return GetBindingKey("ACTIONBUTTON" .. (slot - 12))
-	elseif slot <= 36 then
-		return GetBindingKey("MULTIACTIONBAR3BUTTON" .. (slot - 24))
-	elseif slot <= 48 then
-		return GetBindingKey("MULTIACTIONBAR4BUTTON" .. (slot - 36))
-	elseif slot <= 60 then
-		return GetBindingKey("MULTIACTIONBAR2BUTTON" .. (slot - 48))
-	elseif slot <= 72 then
-		return GetBindingKey("MULTIACTIONBAR1BUTTON" .. (slot - 60))
-	elseif slot >= 145 and slot <= 156 then
-		return GetBindingKey("MULTIACTIONBAR5BUTTON" .. (slot - 144))
-	elseif slot >= 157 and slot <= 168 then
-		return GetBindingKey("MULTIACTIONBAR6BUTTON" .. (slot - 156))
-	elseif slot >= 169 and slot <= 180 then
-		return GetBindingKey("MULTIACTIONBAR7BUTTON" .. (slot - 168))
+	-- Resolve action slot to the correct keybinding using table lookup
+	for _, mapping in ipairs(ACTIONBAR_SLOT_MAPPING) do
+		if slot >= mapping[1] and slot <= mapping[2] then
+			local buttonIndex = slot + mapping[4]
+			return GetBindingKey(mapping[3]:format(buttonIndex))
+		end
 	end
 	return nil
 end
@@ -280,6 +281,17 @@ function AssKey:ADDON_LOADED(event, name)
 	self:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
 	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 	self:RegisterEvent("UPDATE_BINDINGS")
+
+	-- Hook action bar slot changes to mark maps dirty and trigger rescan immediately
+	-- instead of waiting for the 2-second cooldown on FindSBAOverlayButton()
+	self:HookScript("ACTIONBAR_SLOT_CHANGED", function()
+		if GetTime() - self.lastScanTime >= 0.2 then -- Debounce at 200ms
+			self.lastScanTime = GetTime()
+			self.mapsDirty = true
+			self.cachedSBAButton = nil
+			self:ScheduleUpdate()
+		end
+	end)
 
 	self:UnregisterEvent(event)
 end
