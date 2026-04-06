@@ -108,8 +108,7 @@ function AssKey:FindSBAOverlayButton()
 
 	local spellID = C_AssistedCombat.GetNextCastSpell()
 	if not spellID or spellID <= 0 then
-		self.cachedSBAButton = nil
-		return nil
+		return self.cachedSBAButton or nil
 	end
 
 	-- Button is still alive and visible — reference is valid, return it.
@@ -152,8 +151,6 @@ function AssKey:FindSBAOverlayButton()
 		end
 		frame = EnumerateFrames(frame)
 	end
-
-	self.cachedSBAButton = nil
 	return nil
 end
 
@@ -196,6 +193,8 @@ function AssKey:ScheduleUpdate()
 end
 
 function AssKey:Update()
+	if not AssKeyDB then return end
+
 	local button = self:FindSBAOverlayButton()
 	if not button or not button:IsShown() then
 		self:Hide()
