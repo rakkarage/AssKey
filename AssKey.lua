@@ -1,5 +1,11 @@
-AssKey = CreateFrame("Frame", "AssKeyFrame", UIParent)
-AssKey.name = ...
+-- AssKey: Displays keybinds for spell suggestions
+
+local addonName, ns = ...
+
+ns.AssKey = CreateFrame("Frame", "AssKeyFrame", UIParent)
+local AssKey = ns.AssKey
+AssKey.name = addonName
+
 AssKey.defaults = {
 	fontSize = 24,
 	offsetX = 0,
@@ -14,6 +20,15 @@ AssKey.defaults = {
 	justifyV = "MIDDLE",
 }
 
+AssKey.cachedSBAButton = nil
+AssKey.lastScanTime = 0
+AssKey.scanCooldown = 2.0
+AssKey.pendingUpdate = false
+AssKey.spellToSlot = {}
+AssKey.slotToBinding = {}
+AssKey.mapsDirty = true
+AssKey.hookedButtons = nil
+
 AssKey:SetFrameStrata("MEDIUM")
 AssKey:SetFrameLevel(9999)
 AssKey:SetSize(50, 50)
@@ -23,77 +38,14 @@ AssKey.keybind = AssKey:CreateFontString(nil, "OVERLAY")
 AssKey.keybind:SetPoint("CENTER", 0, 0)
 AssKey.keybind:SetDrawLayer("OVERLAY", 7)
 
-AssKey.cachedSBAButton = nil
-AssKey.lastScanTime = 0
-AssKey.scanCooldown = 2.0
-AssKey.pendingUpdate = false
-
-AssKey.spellToSlot = {}
-AssKey.slotToBinding = {}
-AssKey.mapsDirty = true
-
-function AssKey:OnEvent(event, ...)
-	if self[event] then
-		self[event](self, event, ...)
-	else
-		self.mapsDirty = true
-		self:ScheduleUpdate()
-	end
-end
-
-AssKey:SetScript("OnEvent", AssKey.OnEvent)
-AssKey:RegisterEvent("ADDON_LOADED")
-
-function AssKey:ADDON_LOADED(event, name)
-	if name ~= self.name then return end
-
-	AssKeyDB = AssKeyDB or {}
-	for k, v in pairs(self.defaults) do
-		if AssKeyDB[k] == nil then
-			AssKeyDB[k] = v
-		end
-	end
-
-	self:InitializeOptions()
-
-	self:RegisterEvent("PLAYER_ENTERING_WORLD")
-	self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-	self:RegisterEvent("PLAYER_TALENT_UPDATE")
-	self:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
-	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
-	self:RegisterEvent("UPDATE_BINDINGS")
-
-	self:UnregisterEvent(event)
-end
-
-function AssKey:BuildSpellSlotMap()
-	wipe(self.spellToSlot)
-	wipe(self.slotToBinding)
-
-	for slot = 1, 120 do
-		local actionType, id = GetActionInfo(slot)
-		if (actionType == "spell" or actionType == "macro") and id and id > 0 then
-			local bindingKey = self:GetBindingKeyForSlot(slot)
-			if bindingKey and not self.spellToSlot[id] then
-				self.spellToSlot[id] = slot
-				self.slotToBinding[slot] = self:AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true))
-			end
-		end
-	end
-
-	self.mapsDirty = false
-end
-
-function AssKey:AbbreviateBinding(binding)
+local function AbbreviateBinding(binding)
 	if not binding then return binding end
 	binding = binding:gsub("Mouse Button (%d+)", "M%1")
 	return binding
 end
 
--- Slots 73–144 are legacy stance-bar pages (73–120) and possess/vehicle bars
--- (121–144). Stance paging was removed in Legion (7.0.3); possess bars are
--- read-only system slots. Neither range has player-assignable bindings.
-function AssKey:GetBindingKeyForSlot(slot)
+local function GetBindingKeyForSlot(slot)
+	-- Slots 73–144 are legacy stance-bar pages (73–120) and possess/vehicle bars
 	if slot <= 12 then
 		return GetBindingKey("ACTIONBUTTON" .. slot)
 	elseif slot <= 24 then
@@ -116,6 +68,24 @@ function AssKey:GetBindingKeyForSlot(slot)
 	return nil
 end
 
+function AssKey:BuildSpellSlotMap()
+	wipe(self.spellToSlot)
+	wipe(self.slotToBinding)
+
+	for slot = 1, 120 do
+		local actionType, id = GetActionInfo(slot)
+		if (actionType == "spell" or actionType == "macro") and id and id > 0 then
+			local bindingKey = GetBindingKeyForSlot(slot)
+			if bindingKey and not self.spellToSlot[id] then
+				self.spellToSlot[id] = slot
+				self.slotToBinding[slot] = AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true))
+			end
+		end
+	end
+
+	self.mapsDirty = false
+end
+
 function AssKey:GetKeybindForSpell(spellID)
 	if self.mapsDirty then self:BuildSpellSlotMap() end
 
@@ -123,20 +93,11 @@ function AssKey:GetKeybindForSpell(spellID)
 	if not slot then return "" end
 
 	if not self.slotToBinding[slot] then
-		local bindingKey = self:GetBindingKeyForSlot(slot)
-		self.slotToBinding[slot] = bindingKey and self:AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true)) or ""
+		local bindingKey = GetBindingKeyForSlot(slot)
+		self.slotToBinding[slot] = bindingKey and AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true)) or ""
 	end
 
 	return self.slotToBinding[slot]
-end
-
-function AssKey:ScheduleUpdate()
-	if self.pendingUpdate then return end
-	self.pendingUpdate = true
-	C_Timer.After(0.1, function()
-		self.pendingUpdate = false
-		self:Update()
-	end)
 end
 
 function AssKey:FindSBAOverlayButton()
@@ -209,9 +170,9 @@ function AssKey:GetCurrentRecommendedSpell()
 	return nil
 end
 
--- Combine justifyH (LEFT/CENTER/RIGHT) and justifyV (TOP/MIDDLE/BOTTOM)
--- into a WoW anchor point string e.g. "TOPLEFT", "CENTER", "BOTTOMRIGHT"
 function AssKey:GetAnchorPoint()
+	-- Combine justifyH (LEFT/CENTER/RIGHT) and justifyV (TOP/MIDDLE/BOTTOM)
+	-- into a WoW anchor point string e.g. "TOPLEFT", "CENTER", "BOTTOMRIGHT"
 	local h = AssKeyDB.justifyH or self.defaults.justifyH
 	local v = AssKeyDB.justifyV or self.defaults.justifyV
 	if v == "MIDDLE" and h == "CENTER" then
@@ -223,6 +184,15 @@ function AssKey:GetAnchorPoint()
 	else
 		return v .. h -- e.g. "TOP" .. "LEFT" = "TOPLEFT"
 	end
+end
+
+function AssKey:ScheduleUpdate()
+	if self.pendingUpdate then return end
+	self.pendingUpdate = true
+	C_Timer.After(0.1, function()
+		self.pendingUpdate = false
+		self:Update()
+	end)
 end
 
 function AssKey:Update()
@@ -283,6 +253,40 @@ function AssKey:Update()
 	self.keybind:SetText(keybind)
 	self:Show()
 end
+
+function AssKey:OnEvent(event, ...)
+	if self[event] then
+		self[event](self, event, ...)
+	else
+		self.mapsDirty = true
+		self:ScheduleUpdate()
+	end
+end
+
+function AssKey:ADDON_LOADED(event, name)
+	if name ~= self.name then return end
+
+	AssKeyDB = AssKeyDB or {}
+	for k, v in pairs(self.defaults) do
+		if AssKeyDB[k] == nil then
+			AssKeyDB[k] = v
+		end
+	end
+
+	self:InitializeOptions()
+
+	self:RegisterEvent("PLAYER_ENTERING_WORLD")
+	self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+	self:RegisterEvent("PLAYER_TALENT_UPDATE")
+	self:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
+	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+	self:RegisterEvent("UPDATE_BINDINGS")
+
+	self:UnregisterEvent(event)
+end
+
+AssKey:SetScript("OnEvent", AssKey.OnEvent)
+AssKey:RegisterEvent("ADDON_LOADED")
 
 function AssKey:InitializeOptions()
 	local category = Settings.RegisterVerticalLayoutCategory(self.name)
