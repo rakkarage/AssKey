@@ -1,11 +1,11 @@
-## Interface: 120001
-## Version: v2026.4
 ## Title: AssKey
-## Category: User Interface
 ## Notes: Display hotkey on SingleButtonAssistant.
+## Category: User Interface
 ## Author: rakkarage
 ## SavedVariables: AssKeyDB
 ## AddonCompartmentFunc: AssKey_Settings
 ## IconTexture: Interface/AddOns/AssKey/AssKey.png
+## Version: v2026.4
+## Interface: 120001
 
 AssKey.lua
