@@ -1,5 +1,5 @@
 ## Title: AssKey
-## Notes: Display hotkey on SingleButtonAssistant.
+## Notes: Displays keybinds for Single Button Assistant spell suggestions.
 ## Category: User Interface
 ## Author: rakkarage
 ## SavedVariables: AssKeyDB

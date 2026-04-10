@@ -1,4 +1,4 @@
--- AssKey: Displays keybinds for spell suggestions
+-- 🔑 AssKey: Displays keybinds for Single Button Assistant spell suggestions.
 
 local addonName, ns = ...
 

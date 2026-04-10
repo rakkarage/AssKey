@@ -1,4 +1,6 @@
-# 🔑 AssKey 
+# 🔑 AssKey
+
+Displays keybinds for Single Button Assistant spell suggestions.
 
 ![screenshot](screenshot.png)
 
