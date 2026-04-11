@@ -23,6 +23,9 @@ AssKey.defaults = {
 AssKey.cachedSBAButton = nil
 AssKey.lastScanTime = 0
 AssKey.scanCooldown = 2.0
+AssKey.lastSlotChangeTime = 0
+AssKey.hideGrace = 0.2
+AssKey.lastValidRecommendationTime = 0
 AssKey.pendingUpdate = false
 AssKey.spellToSlot = {}
 AssKey.slotToBinding = {}
@@ -195,6 +198,7 @@ end
 
 function AssKey:Update()
 	if not AssKeyDB then return end
+	local now = GetTime()
 
 	local button = self:FindSBAOverlayButton()
 	if not button or not button:IsShown() then
@@ -204,15 +208,23 @@ function AssKey:Update()
 
 	local spellID = self:GetCurrentRecommendedSpell()
 	if not spellID or spellID <= 0 then
+		if self:IsShown() and (now - self.lastValidRecommendationTime) < self.hideGrace then
+			return
+		end
 		self:Hide()
 		return
 	end
 
 	local keybind = self:GetKeybindForSpell(spellID)
 	if not keybind or keybind == "" then
+		if self:IsShown() and (now - self.lastValidRecommendationTime) < self.hideGrace then
+			return
+		end
 		self:Hide()
 		return
 	end
+
+	self.lastValidRecommendationTime = now
 
 	local anchor = self:GetAnchorPoint()
 	self:ClearAllPoints()
@@ -248,9 +260,9 @@ function AssKey:Update()
 		self.keybind:SetShadowColor(0, 0, 0, 0)
 	end
 
-	-- forces update shadow by change text
-	self.keybind:SetText("")
-	self.keybind:SetText(keybind)
+	if self.keybind:GetText() ~= keybind then
+		self.keybind:SetText(keybind)
+	end
 	self:Show()
 end
 
@@ -259,6 +271,16 @@ function AssKey:OnEvent(event, ...)
 		self[event](self, event, ...)
 	else
 		self.mapsDirty = true
+		self:ScheduleUpdate()
+	end
+end
+
+function AssKey:ACTIONBAR_SLOT_CHANGED()
+	if GetTime() - self.lastSlotChangeTime >= 0.2 then -- Debounce at 200ms
+		self.lastSlotChangeTime = GetTime()
+		self.lastScanTime = 0
+		self.mapsDirty = true
+		self.cachedSBAButton = nil
 		self:ScheduleUpdate()
 	end
 end
@@ -281,17 +303,6 @@ function AssKey:ADDON_LOADED(event, name)
 	self:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
 	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 	self:RegisterEvent("UPDATE_BINDINGS")
-
-	-- Hook action bar slot changes to mark maps dirty and trigger rescan immediately
-	-- instead of waiting for the 2-second cooldown on FindSBAOverlayButton()
-	self:HookScript("ACTIONBAR_SLOT_CHANGED", function()
-		if GetTime() - self.lastScanTime >= 0.2 then -- Debounce at 200ms
-			self.lastScanTime = GetTime()
-			self.mapsDirty = true
-			self.cachedSBAButton = nil
-			self:ScheduleUpdate()
-		end
-	end)
 
 	self:UnregisterEvent(event)
 end
