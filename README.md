@@ -1,8 +1,8 @@
 # 🔑 AssKey
 
-Displays keybinds for Single Button Assistant spell suggestions.
-
 ![screenshot](screenshot.png)
+
+Displays keybinds for Single Button Assistant spell suggestions.
 
 ## Problem
 
