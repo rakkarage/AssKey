@@ -260,48 +260,38 @@ function AssKey:Update()
 	self:Show()
 end
 
-function AssKey:OnEvent(event, ...)
-	if self[event] then
-		self[event](self, ...)
+AssKey:SetScript("OnEvent", function(self, event, name)
+	if event == "ADDON_LOADED" then
+		if name ~= self.name then return end
+
+		AssKeyDB = AssKeyDB or {}
+		for k, v in pairs(self.defaults) do
+			if AssKeyDB[k] == nil then
+				AssKeyDB[k] = v
+			end
+		end
+
+		self:InitializeOptions()
+		self:RegisterEvent("PLAYER_ENTERING_WORLD")
+		self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+		self:RegisterEvent("PLAYER_TALENT_UPDATE")
+		self:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
+		self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+		self:RegisterEvent("UPDATE_BINDINGS")
+		self:UnregisterEvent(event)
+	elseif event == "ACTIONBAR_SLOT_CHANGED" then
+		if GetTime() - self.lastSlotChangeTime >= 0.2 then
+			self.lastSlotChangeTime = GetTime()
+			self.lastScanTime = 0
+			self.mapsDirty = true
+			self.cachedSBAButton = nil
+			self:ScheduleUpdate()
+		end
 	else
 		self.mapsDirty = true
 		self:ScheduleUpdate()
 	end
-end
-
-function AssKey:ACTIONBAR_SLOT_CHANGED()
-	if GetTime() - self.lastSlotChangeTime >= 0.2 then
-		self.lastSlotChangeTime = GetTime()
-		self.lastScanTime = 0
-		self.mapsDirty = true
-		self.cachedSBAButton = nil
-		self:ScheduleUpdate()
-	end
-end
-
-function AssKey:ADDON_LOADED(event, name)
-	if name ~= self.name then return end
-
-	AssKeyDB = AssKeyDB or {}
-	for k, v in pairs(self.defaults) do
-		if AssKeyDB[k] == nil then
-			AssKeyDB[k] = v
-		end
-	end
-
-	self:InitializeOptions()
-
-	self:RegisterEvent("PLAYER_ENTERING_WORLD")
-	self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-	self:RegisterEvent("PLAYER_TALENT_UPDATE")
-	self:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
-	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
-	self:RegisterEvent("UPDATE_BINDINGS")
-
-	self:UnregisterEvent(event)
-end
-
-AssKey:SetScript("OnEvent", AssKey.OnEvent)
+end)
 AssKey:RegisterEvent("ADDON_LOADED")
 
 function AssKey:InitializeOptions()
