@@ -260,8 +260,9 @@ function AssKey:Update()
 	self:Show()
 end
 
-AssKey:SetScript("OnEvent", function(self, event, name)
+AssKey:SetScript("OnEvent", function(self, event, ...)
 	if event == "ADDON_LOADED" then
+		local name = ...
 		if name ~= self.name then return end
 
 		AssKeyDB = AssKeyDB or {}
