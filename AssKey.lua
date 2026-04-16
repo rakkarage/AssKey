@@ -42,7 +42,7 @@ AssKey.keybind = AssKey:CreateFontString(nil, "OVERLAY")
 AssKey.keybind:SetPoint("CENTER", 0, 0)
 AssKey.keybind:SetDrawLayer("OVERLAY", 7)
 
--- Table-driven action bar slot mapping: { slotMin, slotMax, bindingFormat, slotOffset }
+-- { slotMin, slotMax, bindingFormat, slotOffset }
 local ACTIONBAR_SLOT_MAPPING = {
 	{ 1,   12,  "ACTIONBUTTON%d",          0 },
 	{ 13,  24,  "ACTIONBUTTON%d",          -12 },
@@ -62,7 +62,6 @@ local function AbbreviateBinding(binding)
 end
 
 local function GetBindingKeyForSlot(slot)
-	-- Resolve action slot to the correct keybinding using table lookup
 	for _, mapping in ipairs(ACTIONBAR_SLOT_MAPPING) do
 		if slot >= mapping[1] and slot <= mapping[2] then
 			local buttonIndex = slot + mapping[4]
@@ -115,13 +114,10 @@ function AssKey:FindSBAOverlayButton()
 		return self.cachedSBAButton or nil
 	end
 
-	-- Button is still alive and visible — reference is valid, return it.
-	-- Whether a spell is actively recommended is GetCurrentRecommendedSpell's job.
 	if self.cachedSBAButton and self.cachedSBAButton:IsShown() then
 		return self.cachedSBAButton
 	end
 
-	-- No valid cache, respect cooldown before scanning
 	self.cachedSBAButton = nil
 
 	local now = GetTime()
@@ -172,8 +168,6 @@ function AssKey:GetCurrentRecommendedSpell()
 end
 
 function AssKey:GetAnchorPoint()
-	-- Combine justifyH (LEFT/CENTER/RIGHT) and justifyV (TOP/MIDDLE/BOTTOM)
-	-- into a WoW anchor point string e.g. "TOPLEFT", "CENTER", "BOTTOMRIGHT"
 	local h = AssKeyDB.justifyH or self.defaults.justifyH
 	local v = AssKeyDB.justifyV or self.defaults.justifyV
 	if v == "MIDDLE" and h == "CENTER" then
@@ -183,7 +177,7 @@ function AssKey:GetAnchorPoint()
 	elseif h == "CENTER" then
 		return v
 	else
-		return v .. h -- e.g. "TOP" .. "LEFT" = "TOPLEFT"
+		return v .. h
 	end
 end
 
@@ -268,7 +262,7 @@ end
 
 function AssKey:OnEvent(event, ...)
 	if self[event] then
-		self[event](self, event, ...)
+		self[event](self, ...)
 	else
 		self.mapsDirty = true
 		self:ScheduleUpdate()
@@ -276,7 +270,7 @@ function AssKey:OnEvent(event, ...)
 end
 
 function AssKey:ACTIONBAR_SLOT_CHANGED()
-	if GetTime() - self.lastSlotChangeTime >= 0.2 then -- Debounce at 200ms
+	if GetTime() - self.lastSlotChangeTime >= 0.2 then
 		self.lastSlotChangeTime = GetTime()
 		self.lastScanTime = 0
 		self.mapsDirty = true
