@@ -2,7 +2,7 @@
 
 local addonName, ns = ...
 
-ns.AssKey = CreateFrame("Frame", "AssKeyFrame", UIParent)
+ns.AssKey = CreateFrame("Frame")
 local AssKey = ns.AssKey
 AssKey.name = addonName
 
