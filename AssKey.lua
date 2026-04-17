@@ -191,7 +191,6 @@ function AssKey:ScheduleUpdate()
 end
 
 function AssKey:Update()
-	if not AssKeyDB then return end
 	local now = GetTime()
 
 	local button = self:FindSBAOverlayButton()
@@ -266,9 +265,9 @@ AssKey:SetScript("OnEvent", function(self, event, ...)
 		if name ~= self.name then return end
 
 		AssKeyDB = AssKeyDB or {}
-		for k, v in pairs(self.defaults) do
-			if AssKeyDB[k] == nil then
-				AssKeyDB[k] = v
+		for key, value in pairs(self.defaults) do
+			if AssKeyDB[key] == nil then
+				AssKeyDB[key] = value
 			end
 		end
 
