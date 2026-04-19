@@ -1,18 +1,18 @@
 -- 🔑 AssKey: Displays keybinds for Single Button Assistant spell suggestions.
 
-local addonName = ...
+local _addonName = ...
 
-local frame = CreateFrame("Frame")
-frame:SetFrameStrata("MEDIUM")
-frame:SetFrameLevel(9999)
-frame:SetSize(50, 50)
-frame:Hide()
+local _frame = CreateFrame("Frame")
+_frame:SetFrameStrata("MEDIUM")
+_frame:SetFrameLevel(9999)
+_frame:SetSize(50, 50)
+_frame:Hide()
 
-local keybind = frame:CreateFontString(nil, "OVERLAY")
-keybind:SetPoint("CENTER", 0, 0)
-keybind:SetDrawLayer("OVERLAY", 7)
+local _keybind = _frame:CreateFontString(nil, "OVERLAY")
+_keybind:SetPoint("CENTER", 0, 0)
+_keybind:SetDrawLayer("OVERLAY", 7)
 
-local defaults = {
+local _defaults = {
 	fontSize = 24,
 	offsetX = 0,
 	offsetY = 0,
@@ -26,18 +26,18 @@ local defaults = {
 	justifyV = "MIDDLE",
 }
 
-local category
-local cachedSBAButton
-local lastScanTime = 0
-local scanCooldown = 2.0
-local lastSlotChangeTime = 0
-local hideGrace = 0.2
-local lastValidRecommendationTime = 0
-local pendingUpdate = false
-local spellToSlot = {}
-local slotToBinding = {}
-local mapsDirty = true
-local hookedButtons
+local _category
+local _cachedSBAButton
+local _lastScanTime = 0
+local _scanCooldown = 2.0
+local _lastSlotChangeTime = 0
+local _hideGrace = 0.2
+local _lastValidRecommendationTime = 0
+local _pendingUpdate = false
+local _spellToSlot = {}
+local _slotToBinding = {}
+local _mapsDirty = true
+local _hookedButtons
 
 -- { slotMin, slotMax, bindingFormat, slotOffset }
 local ACTIONBAR_SLOT_MAPPING = {
@@ -69,35 +69,35 @@ local function GetBindingKeyForSlot(slot)
 end
 
 local function BuildSpellSlotMap()
-	wipe(spellToSlot)
-	wipe(slotToBinding)
+	wipe(_spellToSlot)
+	wipe(_slotToBinding)
 	for slot = 1, 120 do
 		local actionType, id = GetActionInfo(slot)
 		if (actionType == "spell" or actionType == "macro") and id and id > 0 then
 			local bindingKey = GetBindingKeyForSlot(slot)
-			if bindingKey and not spellToSlot[id] then
-				spellToSlot[id] = slot
-				slotToBinding[slot] = AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true))
+			if bindingKey and not _spellToSlot[id] then
+				_spellToSlot[id] = slot
+				_slotToBinding[slot] = AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true))
 			end
 		end
 	end
-	mapsDirty = false
+	_mapsDirty = false
 end
 
 local function GetKeybindForSpell(spellID)
-	if mapsDirty then BuildSpellSlotMap() end
-	local slot = spellToSlot[spellID]
+	if _mapsDirty then BuildSpellSlotMap() end
+	local slot = _spellToSlot[spellID]
 	if not slot then return "" end
-	if not slotToBinding[slot] then
+	if not _slotToBinding[slot] then
 		local bindingKey = GetBindingKeyForSlot(slot)
-		slotToBinding[slot] = bindingKey and AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true)) or ""
+		_slotToBinding[slot] = bindingKey and AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true)) or ""
 	end
-	return slotToBinding[slot]
+	return _slotToBinding[slot]
 end
 
 local function GetAnchorPoint()
-	local h = AssKeyDB.justifyH or defaults.justifyH
-	local v = AssKeyDB.justifyV or defaults.justifyV
+	local h = AssKeyDB.justifyH or _defaults.justifyH
+	local v = AssKeyDB.justifyV or _defaults.justifyV
 	if v == "MIDDLE" and h == "CENTER" then
 		return "CENTER"
 	elseif v == "MIDDLE" then
@@ -124,22 +124,22 @@ end
 local ScheduleUpdate
 local function FindSBAOverlayButton()
 	if not C_AssistedCombat or not C_AssistedCombat.GetNextCastSpell then
-		cachedSBAButton = nil
+		_cachedSBAButton = nil
 		return nil
 	end
 	local spellID = C_AssistedCombat.GetNextCastSpell()
 	if not spellID or spellID <= 0 then
-		return cachedSBAButton
+		return _cachedSBAButton
 	end
-	if cachedSBAButton and cachedSBAButton:IsShown() then
-		return cachedSBAButton
+	if _cachedSBAButton and _cachedSBAButton:IsShown() then
+		return _cachedSBAButton
 	end
-	cachedSBAButton = nil
+	_cachedSBAButton = nil
 	local now = GetTime()
-	if now - lastScanTime < scanCooldown then
+	if now - _lastScanTime < _scanCooldown then
 		return nil
 	end
-	lastScanTime = now
+	_lastScanTime = now
 	local f = EnumerateFrames()
 	while f do
 		if f.UpdateAssistedCombatRotationFrame then
@@ -147,13 +147,13 @@ local function FindSBAOverlayButton()
 				local child = select(i, f:GetChildren())
 				if child.ActiveFrame or child.InactiveTexture then
 					if child:IsShown() or (child.ActiveFrame and child.ActiveFrame:IsShown()) then
-						cachedSBAButton = f
-						if not hookedButtons then hookedButtons = {} end
-						if not hookedButtons[f] then
+						_cachedSBAButton = f
+						if not _hookedButtons then _hookedButtons = {} end
+						if not _hookedButtons[f] then
 							hooksecurefunc(f, "UpdateAssistedCombatRotationFrame", function()
 								ScheduleUpdate()
 							end)
-							hookedButtons[f] = true
+							_hookedButtons[f] = true
 						end
 						return f
 					end
@@ -169,117 +169,117 @@ local function Update()
 	local now = GetTime()
 	local button = FindSBAOverlayButton()
 	if not button or not button:IsShown() then
-		frame:Hide()
+		_frame:Hide()
 		return
 	end
 	local spellID = GetCurrentRecommendedSpell()
 	if not spellID or spellID <= 0 then
-		if frame:IsShown() and (now - lastValidRecommendationTime) < hideGrace then
+		if _frame:IsShown() and (now - _lastValidRecommendationTime) < _hideGrace then
 			return
 		end
-		frame:Hide()
+		_frame:Hide()
 		return
 	end
 	local kb = GetKeybindForSpell(spellID)
 	if not kb or kb == "" then
-		if frame:IsShown() and (now - lastValidRecommendationTime) < hideGrace then
+		if _frame:IsShown() and (now - _lastValidRecommendationTime) < _hideGrace then
 			return
 		end
-		frame:Hide()
+		_frame:Hide()
 		return
 	end
-	lastValidRecommendationTime = now
+	_lastValidRecommendationTime = now
 	local anchor = GetAnchorPoint()
-	frame:ClearAllPoints()
-	frame:SetPoint(anchor, button, anchor, AssKeyDB.offsetX, AssKeyDB.offsetY)
+	_frame:ClearAllPoints()
+	_frame:SetPoint(anchor, button, anchor, AssKeyDB.offsetX, AssKeyDB.offsetY)
 	local fontPath = GameFontNormal:GetFont()
-	local outline = AssKeyDB.outline or defaults.outline
-	keybind:SetFont(fontPath, AssKeyDB.fontSize, outline)
-	local h = AssKeyDB.justifyH or defaults.justifyH
-	local v = AssKeyDB.justifyV or defaults.justifyV
-	keybind:SetJustifyH(h)
-	keybind:SetJustifyV(v)
-	keybind:ClearAllPoints()
-	keybind:SetPoint(anchor, frame, anchor, 0, 0)
+	local outline = AssKeyDB.outline or _defaults.outline
+	_keybind:SetFont(fontPath, AssKeyDB.fontSize, outline)
+	local h = AssKeyDB.justifyH or _defaults.justifyH
+	local v = AssKeyDB.justifyV or _defaults.justifyV
+	_keybind:SetJustifyH(h)
+	_keybind:SetJustifyV(v)
+	_keybind:ClearAllPoints()
+	_keybind:SetPoint(anchor, _frame, anchor, 0, 0)
 	local color = CreateColorFromHexString(AssKeyDB.fontColor)
 	if color then
-		keybind:SetTextColor(color:GetRGBA())
+		_keybind:SetTextColor(color:GetRGBA())
 	else
-		keybind:SetTextColor(1, 1, 1, 1)
+		_keybind:SetTextColor(1, 1, 1, 1)
 	end
 	if AssKeyDB.shadowEnabled then
 		local shadowColor = CreateColorFromHexString(AssKeyDB.shadowColor)
 		if shadowColor then
-			keybind:SetShadowColor(shadowColor:GetRGBA())
+			_keybind:SetShadowColor(shadowColor:GetRGBA())
 		else
-			keybind:SetShadowColor(0, 0, 0, 1)
+			_keybind:SetShadowColor(0, 0, 0, 1)
 		end
-		keybind:SetShadowOffset(AssKeyDB.shadowOffsetX, AssKeyDB.shadowOffsetY)
+		_keybind:SetShadowOffset(AssKeyDB.shadowOffsetX, AssKeyDB.shadowOffsetY)
 	else
-		keybind:SetShadowColor(0, 0, 0, 0)
+		_keybind:SetShadowColor(0, 0, 0, 0)
 	end
-	if keybind:GetText() ~= kb then
-		keybind:SetText(kb)
+	if _keybind:GetText() ~= kb then
+		_keybind:SetText(kb)
 	end
-	frame:Show()
+	_frame:Show()
 end
 
 ScheduleUpdate = function ()
-	if pendingUpdate then return end
-	pendingUpdate = true
+	if _pendingUpdate then return end
+	_pendingUpdate = true
 	C_Timer.After(0.1, function()
-		pendingUpdate = false
+		_pendingUpdate = false
 		Update()
 	end)
 end
 
 local function InitializeOptions()
-	category = Settings.RegisterVerticalLayoutCategory(addonName)
+	_category = Settings.RegisterVerticalLayoutCategory(_addonName)
 	local function CreateSliderWithValue(setting, min, max, step, tooltip)
 		local options = Settings.CreateSliderOptions(min, max, step)
 		options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right)
-		Settings.CreateSlider(category, setting, options, tooltip)
+		Settings.CreateSlider(_category, setting, options, tooltip)
 	end
-	local fontSizeSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_FontSize", "fontSize", AssKeyDB, Settings.VarType.Number, "Font Size", defaults.fontSize)
+	local fontSizeSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_FontSize", "fontSize", AssKeyDB, Settings.VarType.Number, "Font Size", _defaults.fontSize)
 	fontSizeSetting:SetValueChangedCallback(ScheduleUpdate)
 	CreateSliderWithValue(fontSizeSetting, 8, 72, 1, "Font size of the keybind text.")
-	local offsetXSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_OffsetX", "offsetX", AssKeyDB, Settings.VarType.Number, "Horizontal Offset", defaults.offsetX)
+	local offsetXSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_OffsetX", "offsetX", AssKeyDB, Settings.VarType.Number, "Horizontal Offset", _defaults.offsetX)
 	offsetXSetting:SetValueChangedCallback(ScheduleUpdate)
 	CreateSliderWithValue(offsetXSetting, -200, 200, 5, "Horizontal position relative to the SBA button.")
-	local offsetYSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_OffsetY", "offsetY", AssKeyDB, Settings.VarType.Number, "Vertical Offset", defaults.offsetY)
+	local offsetYSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_OffsetY", "offsetY", AssKeyDB, Settings.VarType.Number, "Vertical Offset", _defaults.offsetY)
 	offsetYSetting:SetValueChangedCallback(ScheduleUpdate)
 	CreateSliderWithValue(offsetYSetting, -200, 200, 5, "Vertical position relative to the SBA button.")
-	local justifyHSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_JustifyH", "justifyH", AssKeyDB, Settings.VarType.String, "Horizontal Alignment", defaults.justifyH)
+	local justifyHSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_JustifyH", "justifyH", AssKeyDB, Settings.VarType.String, "Horizontal Alignment", _defaults.justifyH)
 	justifyHSetting:SetValueChangedCallback(ScheduleUpdate)
-	Settings.CreateDropdown(category, justifyHSetting, function()
+	Settings.CreateDropdown(_category, justifyHSetting, function()
 		local container = Settings.CreateControlTextContainer()
 		container:Add("LEFT", "Left")
 		container:Add("CENTER", "Center")
 		container:Add("RIGHT", "Right")
 		return container:GetData()
 	end, "Horizontal anchor point on the SBA button.")
-	local justifyVSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_JustifyV", "justifyV", AssKeyDB, Settings.VarType.String, "Vertical Alignment", defaults.justifyV)
+	local justifyVSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_JustifyV", "justifyV", AssKeyDB, Settings.VarType.String, "Vertical Alignment", _defaults.justifyV)
 	justifyVSetting:SetValueChangedCallback(ScheduleUpdate)
-	Settings.CreateDropdown(category, justifyVSetting, function()
+	Settings.CreateDropdown(_category, justifyVSetting, function()
 		local container = Settings.CreateControlTextContainer()
 		container:Add("TOP", "Top")
 		container:Add("MIDDLE", "Middle")
 		container:Add("BOTTOM", "Bottom")
 		return container:GetData()
 	end, "Vertical anchor point on the SBA button.")
-	local fontColorSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_FontColor", "fontColor", AssKeyDB, Settings.VarType.Color, "Font Color", defaults.fontColor)
+	local fontColorSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_FontColor", "fontColor", AssKeyDB, Settings.VarType.Color, "Font Color", _defaults.fontColor)
 	fontColorSetting:SetValueChangedCallback(ScheduleUpdate)
-	Settings.CreateColorSwatch(category, fontColorSetting, "Color of the keybind text.")
-	local outlineSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_Outline", "outline", AssKeyDB, Settings.VarType.String, "Outline Style", defaults.outline)
+	Settings.CreateColorSwatch(_category, fontColorSetting, "Color of the keybind text.")
+	local outlineSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_Outline", "outline", AssKeyDB, Settings.VarType.String, "Outline Style", _defaults.outline)
 	outlineSetting:SetValueChangedCallback(ScheduleUpdate)
-	Settings.CreateDropdown(category, outlineSetting, function()
+	Settings.CreateDropdown(_category, outlineSetting, function()
 		local container = Settings.CreateControlTextContainer()
 		container:Add("", "None")
 		container:Add("OUTLINE", "Outline")
@@ -288,32 +288,32 @@ local function InitializeOptions()
 		container:Add("OUTLINE,MONOCHROME", "Outline + Monochrome")
 		return container:GetData()
 	end, "Outline drawn around the keybind text.")
-	local shadowEnabledSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_ShadowEnabled", "shadowEnabled", AssKeyDB, Settings.VarType.Boolean, "Enable Shadow", defaults.shadowEnabled)
+	local shadowEnabledSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_ShadowEnabled", "shadowEnabled", AssKeyDB, Settings.VarType.Boolean, "Enable Shadow", _defaults.shadowEnabled)
 	shadowEnabledSetting:SetValueChangedCallback(ScheduleUpdate)
-	Settings.CreateCheckbox(category, shadowEnabledSetting, "Toggle display of shadow.")
-	local shadowColorSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_ShadowColor", "shadowColor", AssKeyDB, Settings.VarType.Color, "Shadow Color", defaults.shadowColor)
+	Settings.CreateCheckbox(_category, shadowEnabledSetting, "Toggle display of shadow.")
+	local shadowColorSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_ShadowColor", "shadowColor", AssKeyDB, Settings.VarType.Color, "Shadow Color", _defaults.shadowColor)
 	shadowColorSetting:SetValueChangedCallback(ScheduleUpdate)
-	Settings.CreateColorSwatch(category, shadowColorSetting, "Color of the shadow behind the text.")
-	local shadowOffsetXSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_ShadowOffsetX", "shadowOffsetX", AssKeyDB, Settings.VarType.Number, "Shadow Offset X", defaults.shadowOffsetX)
+	Settings.CreateColorSwatch(_category, shadowColorSetting, "Color of the shadow behind the text.")
+	local shadowOffsetXSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_ShadowOffsetX", "shadowOffsetX", AssKeyDB, Settings.VarType.Number, "Shadow Offset X", _defaults.shadowOffsetX)
 	shadowOffsetXSetting:SetValueChangedCallback(ScheduleUpdate)
 	CreateSliderWithValue(shadowOffsetXSetting, -20, 20, 1, "Horizontal position of the shadow.")
-	local shadowOffsetYSetting = Settings.RegisterAddOnSetting(category,
-		"AssKey_ShadowOffsetY", "shadowOffsetY", AssKeyDB, Settings.VarType.Number, "Shadow Offset Y", defaults.shadowOffsetY)
+	local shadowOffsetYSetting = Settings.RegisterAddOnSetting(_category,
+		"AssKey_ShadowOffsetY", "shadowOffsetY", AssKeyDB, Settings.VarType.Number, "Shadow Offset Y", _defaults.shadowOffsetY)
 	shadowOffsetYSetting:SetValueChangedCallback(ScheduleUpdate)
 	CreateSliderWithValue(shadowOffsetYSetting, -20, 20, 1, "Vertical position of the shadow.")
-	Settings.RegisterAddOnCategory(category)
+	Settings.RegisterAddOnCategory(_category)
 end
 
-frame:RegisterEvent("ADDON_LOADED")
-frame:SetScript("OnEvent", function(self, event, ...)
+_frame:RegisterEvent("ADDON_LOADED")
+_frame:SetScript("OnEvent", function(self, event, ...)
 	if event == "ADDON_LOADED" then
 		local name = ...
-		if name ~= addonName then return end
+		if name ~= _addonName then return end
 		AssKeyDB = AssKeyDB or {}
-		for key, value in pairs(defaults) do
+		for key, value in pairs(_defaults) do
 			if AssKeyDB[key] == nil then
 				AssKeyDB[key] = value
 			end
@@ -327,22 +327,22 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		self:RegisterEvent("UPDATE_BINDINGS")
 		self:UnregisterEvent(event)
 	elseif event == "ACTIONBAR_SLOT_CHANGED" then
-		if GetTime() - lastSlotChangeTime >= 0.2 then
-			lastSlotChangeTime = GetTime()
-			lastScanTime = 0
-			mapsDirty = true
-			cachedSBAButton = nil
+		if GetTime() - _lastSlotChangeTime >= 0.2 then
+			_lastSlotChangeTime = GetTime()
+			_lastScanTime = 0
+			_mapsDirty = true
+			_cachedSBAButton = nil
 			ScheduleUpdate()
 		end
 	else
-		mapsDirty = true
+		_mapsDirty = true
 		ScheduleUpdate()
 	end
 end)
 
 function AssKey_Settings()
-	if not InCombatLockdown() and category then
-		Settings.OpenToCategory(category:GetID())
+	if not InCombatLockdown() and _category then
+		Settings.OpenToCategory(_category:GetID())
 	end
 end
 
