@@ -27,7 +27,7 @@ local defaults = {
 }
 
 local category
-local cachedSBAButton = nil
+local cachedSBAButton
 local lastScanTime = 0
 local scanCooldown = 2.0
 local lastSlotChangeTime = 0
@@ -37,7 +37,7 @@ local pendingUpdate = false
 local spellToSlot = {}
 local slotToBinding = {}
 local mapsDirty = true
-local hookedButtons = nil
+local hookedButtons
 
 -- { slotMin, slotMax, bindingFormat, slotOffset }
 local ACTIONBAR_SLOT_MAPPING = {
@@ -129,7 +129,7 @@ local function FindSBAOverlayButton()
 	end
 	local spellID = C_AssistedCombat.GetNextCastSpell()
 	if not spellID or spellID <= 0 then
-		return cachedSBAButton or nil
+		return cachedSBAButton
 	end
 	if cachedSBAButton and cachedSBAButton:IsShown() then
 		return cachedSBAButton
@@ -307,12 +307,6 @@ local function InitializeOptions()
 	Settings.RegisterAddOnCategory(category)
 end
 
-function AssKey_Settings()
-	if not InCombatLockdown() and category then
-		Settings.OpenToCategory(category:GetID())
-	end
-end
-
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(self, event, ...)
 	if event == "ADDON_LOADED" then
@@ -345,6 +339,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		ScheduleUpdate()
 	end
 end)
+
+function AssKey_Settings()
+	if not InCombatLockdown() and category then
+		Settings.OpenToCategory(category:GetID())
+	end
+end
 
 SLASH_ASSKEY1 = "/ak"
 SLASH_ASSKEY2 = "/asskey"
