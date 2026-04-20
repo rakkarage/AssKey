@@ -30,7 +30,6 @@ local _category
 local _cachedSBAButton
 local _lastScanTime = 0
 local _scanCooldown = 2.0
-local _lastSlotChangeTime = 0
 local _hideGrace = 0.2
 local _lastValidRecommendationTime = 0
 local _pendingUpdate = false
@@ -68,30 +67,52 @@ local function GetBindingKeyForSlot(slot)
 	return nil
 end
 
+local function UpdateSingleSlot(slot)
+	if not slot or slot < 1 or slot > 120 then return end
+
+	for spellID, mappedSlot in pairs(_spellToSlot) do
+		if mappedSlot == slot then
+			_spellToSlot[spellID] = nil
+			break
+		end
+	end
+
+	local actionType, id = GetActionInfo(slot)
+	if (actionType == "spell" or actionType == "macro") and id and id > 0 then
+		local bindingKey = GetBindingKeyForSlot(slot)
+		if bindingKey then
+			_spellToSlot[id] = slot
+			_slotToBinding[slot] = AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true))
+		else
+			_slotToBinding[slot] = nil
+		end
+	else
+		_slotToBinding[slot] = nil
+	end
+end
+
 local function BuildSpellSlotMap()
 	wipe(_spellToSlot)
 	wipe(_slotToBinding)
 	for slot = 1, 120 do
-		local actionType, id = GetActionInfo(slot)
-		if (actionType == "spell" or actionType == "macro") and id and id > 0 then
-			local bindingKey = GetBindingKeyForSlot(slot)
-			if bindingKey and not _spellToSlot[id] then
-				_spellToSlot[id] = slot
-				_slotToBinding[slot] = AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true))
-			end
-		end
+		UpdateSingleSlot(slot)
 	end
 	_mapsDirty = false
 end
 
 local function GetKeybindForSpell(spellID)
-	if _mapsDirty then BuildSpellSlotMap() end
+	if _mapsDirty then
+		BuildSpellSlotMap()
+	end
+
 	local slot = _spellToSlot[spellID]
 	if not slot then return "" end
+
 	if not _slotToBinding[slot] then
 		local bindingKey = GetBindingKeyForSlot(slot)
 		_slotToBinding[slot] = bindingKey and AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true)) or ""
 	end
+
 	return _slotToBinding[slot]
 end
 
@@ -224,7 +245,7 @@ local function Update()
 	_frame:Show()
 end
 
-ScheduleUpdate = function ()
+ScheduleUpdate = function()
 	if _pendingUpdate then return end
 	_pendingUpdate = true
 	C_Timer.After(0.1, function()
@@ -327,11 +348,9 @@ _frame:SetScript("OnEvent", function(self, event, ...)
 		self:RegisterEvent("UPDATE_BINDINGS")
 		self:UnregisterEvent(event)
 	elseif event == "ACTIONBAR_SLOT_CHANGED" then
-		if GetTime() - _lastSlotChangeTime >= 0.2 then
-			_lastSlotChangeTime = GetTime()
-			_lastScanTime = 0
-			_mapsDirty = true
-			_cachedSBAButton = nil
+		local slotID = ...
+		if slotID then
+			UpdateSingleSlot(slotID)
 			ScheduleUpdate()
 		end
 	else
