@@ -159,18 +159,22 @@ local function FindSBAOverlayButton()
 		_cachedSBAButton = nil
 		return nil
 	end
+
 	local spellID = C_AssistedCombat.GetNextCastSpell()
 	if not spellID or spellID <= 0 then
 		return _cachedSBAButton
 	end
+
 	if _cachedSBAButton and _cachedSBAButton:IsShown() then
 		return _cachedSBAButton
 	end
+
 	_cachedSBAButton = nil
 	local now = GetTime()
 	if now - _lastScanTime < _scanCooldown then
 		return nil
 	end
+
 	_lastScanTime = now
 	local f = EnumerateFrames()
 	while f do
@@ -267,23 +271,28 @@ end
 
 local function InitializeOptions()
 	_category = Settings.RegisterVerticalLayoutCategory(_addonName)
+
 	local function CreateSliderWithValue(setting, min, max, step, tooltip)
 		local options = Settings.CreateSliderOptions(min, max, step)
 		options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right)
 		Settings.CreateSlider(_category, setting, options, tooltip)
 	end
+
 	local fontSizeSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_FontSize", "fontSize", AssKeyDB, Settings.VarType.Number, "Font Size", _defaults.fontSize)
 	fontSizeSetting:SetValueChangedCallback(ScheduleUpdate)
 	CreateSliderWithValue(fontSizeSetting, 8, 72, 1, "Font size of the keybind text.")
+
 	local offsetXSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_OffsetX", "offsetX", AssKeyDB, Settings.VarType.Number, "Horizontal Offset", _defaults.offsetX)
 	offsetXSetting:SetValueChangedCallback(ScheduleUpdate)
 	CreateSliderWithValue(offsetXSetting, -200, 200, 5, "Horizontal position relative to the SBA button.")
+
 	local offsetYSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_OffsetY", "offsetY", AssKeyDB, Settings.VarType.Number, "Vertical Offset", _defaults.offsetY)
 	offsetYSetting:SetValueChangedCallback(ScheduleUpdate)
 	CreateSliderWithValue(offsetYSetting, -200, 200, 5, "Vertical position relative to the SBA button.")
+
 	local justifyHSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_JustifyH", "justifyH", AssKeyDB, Settings.VarType.String, "Horizontal Alignment", _defaults.justifyH)
 	justifyHSetting:SetValueChangedCallback(ScheduleUpdate)
@@ -294,6 +303,7 @@ local function InitializeOptions()
 		container:Add("RIGHT", "Right")
 		return container:GetData()
 	end, "Horizontal anchor point on the SBA button.")
+
 	local justifyVSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_JustifyV", "justifyV", AssKeyDB, Settings.VarType.String, "Vertical Alignment", _defaults.justifyV)
 	justifyVSetting:SetValueChangedCallback(ScheduleUpdate)
@@ -304,10 +314,12 @@ local function InitializeOptions()
 		container:Add("BOTTOM", "Bottom")
 		return container:GetData()
 	end, "Vertical anchor point on the SBA button.")
+
 	local fontColorSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_FontColor", "fontColor", AssKeyDB, Settings.VarType.Color, "Font Color", _defaults.fontColor)
 	fontColorSetting:SetValueChangedCallback(ScheduleUpdate)
 	Settings.CreateColorSwatch(_category, fontColorSetting, "Color of the keybind text.")
+
 	local outlineSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_Outline", "outline", AssKeyDB, Settings.VarType.String, "Outline Style", _defaults.outline)
 	outlineSetting:SetValueChangedCallback(ScheduleUpdate)
@@ -320,22 +332,27 @@ local function InitializeOptions()
 		container:Add("OUTLINE,MONOCHROME", "Outline + Monochrome")
 		return container:GetData()
 	end, "Outline drawn around the keybind text.")
+
 	local shadowEnabledSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_ShadowEnabled", "shadowEnabled", AssKeyDB, Settings.VarType.Boolean, "Enable Shadow", _defaults.shadowEnabled)
 	shadowEnabledSetting:SetValueChangedCallback(ScheduleUpdate)
 	Settings.CreateCheckbox(_category, shadowEnabledSetting, "Toggle display of shadow.")
+
 	local shadowColorSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_ShadowColor", "shadowColor", AssKeyDB, Settings.VarType.Color, "Shadow Color", _defaults.shadowColor)
 	shadowColorSetting:SetValueChangedCallback(ScheduleUpdate)
 	Settings.CreateColorSwatch(_category, shadowColorSetting, "Color of the shadow behind the text.")
+
 	local shadowOffsetXSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_ShadowOffsetX", "shadowOffsetX", AssKeyDB, Settings.VarType.Number, "Shadow Offset X", _defaults.shadowOffsetX)
 	shadowOffsetXSetting:SetValueChangedCallback(ScheduleUpdate)
 	CreateSliderWithValue(shadowOffsetXSetting, -20, 20, 1, "Horizontal position of the shadow.")
+
 	local shadowOffsetYSetting = Settings.RegisterAddOnSetting(_category,
 		"AssKey_ShadowOffsetY", "shadowOffsetY", AssKeyDB, Settings.VarType.Number, "Shadow Offset Y", _defaults.shadowOffsetY)
 	shadowOffsetYSetting:SetValueChangedCallback(ScheduleUpdate)
 	CreateSliderWithValue(shadowOffsetYSetting, -20, 20, 1, "Vertical position of the shadow.")
+
 	Settings.RegisterAddOnCategory(_category)
 end
 local _slotCache = {}
@@ -344,12 +361,14 @@ _frame:SetScript("OnEvent", function(self, event, ...)
 	if event == "ADDON_LOADED" then
 		local name = ...
 		if name ~= _addonName then return end
+
 		AssKeyDB = AssKeyDB or {}
 		for key, value in pairs(_defaults) do
 			if AssKeyDB[key] == nil then
 				AssKeyDB[key] = value
 			end
 		end
+
 		InitializeOptions()
 		self:RegisterEvent("ACTIONBAR_PAGE_CHANGED")
 		self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
