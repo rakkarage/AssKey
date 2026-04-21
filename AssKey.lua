@@ -40,6 +40,8 @@ local _hookedButtons
 
 -- { slotMin, slotMax, bindingFormat, slotOffset }
 local ACTIONBAR_SLOT_MAPPING = {
+	{ 121, 132, "ACTIONBUTTON%d",          -120 }, -- Override action bar
+	{ 133, 144, "ACTIONBUTTON%d",          -132 }, -- Vehicle/possess bar
 	{ 1,   12,  "ACTIONBUTTON%d",          0 },
 	{ 13,  24,  "ACTIONBUTTON%d",          -12 },
 	{ 25,  36,  "MULTIACTIONBAR3BUTTON%d", -24 },
@@ -67,35 +69,39 @@ local function GetBindingKeyForSlot(slot)
 	return nil
 end
 
-local function UpdateSingleSlot(slot)
-	if not slot or slot < 1 or slot > 120 then return end
+local function IsBonusBarSlot(slot)
+	return slot >= 121 and slot <= 144
+end
 
-	for spellID, mappedSlot in pairs(_spellToSlot) do
-		if mappedSlot == slot then
-			_spellToSlot[spellID] = nil
-			break
-		end
+local function IsSlotActiveForCurrentBar(slot)
+	if HasBonusActionBar() then
+		return IsBonusBarSlot(slot)
 	end
-
-	local actionType, id = GetActionInfo(slot)
-	if (actionType == "spell" or actionType == "macro") and id and id > 0 then
-		local bindingKey = GetBindingKeyForSlot(slot)
-		if bindingKey then
-			_spellToSlot[id] = slot
-			_slotToBinding[slot] = AbbreviateBinding(GetBindingText(bindingKey, "KEY_", true))
-		else
-			_slotToBinding[slot] = nil
-		end
-	else
-		_slotToBinding[slot] = nil
-	end
+	return not IsBonusBarSlot(slot)
 end
 
 local function BuildSpellSlotMap()
 	wipe(_spellToSlot)
 	wipe(_slotToBinding)
-	for slot = 1, 120 do
-		UpdateSingleSlot(slot)
+	for _, mapping in ipairs(ACTIONBAR_SLOT_MAPPING) do
+		local isBonusRange = IsBonusBarSlot(mapping[1]) and IsBonusBarSlot(mapping[2])
+		if isBonusRange and not HasBonusActionBar() then
+			-- Skip override/vehicle slots when not mounted/in vehicle
+		else
+			for slot = mapping[1], mapping[2] do
+				local actionType, id = GetActionInfo(slot)
+				if (actionType == "spell" or actionType == "macro") and id and id > 0 then
+					if not _spellToSlot[id] then
+						local bindingKey = GetBindingKeyForSlot(slot)
+						if bindingKey then
+							_spellToSlot[id] = slot
+							_slotToBinding[slot] = AbbreviateBinding(
+								GetBindingText(bindingKey, "KEY_", true))
+						end
+					end
+				end
+			end
+		end
 	end
 	_mapsDirty = false
 end
@@ -107,6 +113,11 @@ local function GetKeybindForSpell(spellID)
 
 	local slot = _spellToSlot[spellID]
 	if not slot then return "" end
+
+	-- If a mounted/override bar is active, only show bindings from active slots.
+	if not IsSlotActiveForCurrentBar(slot) then
+		return ""
+	end
 
 	if not _slotToBinding[slot] then
 		local bindingKey = GetBindingKeyForSlot(slot)
@@ -327,7 +338,7 @@ local function InitializeOptions()
 	CreateSliderWithValue(shadowOffsetYSetting, -20, 20, 1, "Vertical position of the shadow.")
 	Settings.RegisterAddOnCategory(_category)
 end
-
+local _slotCache = {}
 _frame:RegisterEvent("ADDON_LOADED")
 _frame:SetScript("OnEvent", function(self, event, ...)
 	if event == "ADDON_LOADED" then
@@ -340,19 +351,27 @@ _frame:SetScript("OnEvent", function(self, event, ...)
 			end
 		end
 		InitializeOptions()
+		self:RegisterEvent("ACTIONBAR_PAGE_CHANGED")
+		self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 		self:RegisterEvent("PLAYER_ENTERING_WORLD")
 		self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 		self:RegisterEvent("PLAYER_TALENT_UPDATE")
-		self:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
-		self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 		self:RegisterEvent("UPDATE_BINDINGS")
+		self:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
+		self:RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR")
+		self:RegisterEvent("UPDATE_POSSESS_BAR")
 		self:UnregisterEvent(event)
 	elseif event == "ACTIONBAR_SLOT_CHANGED" then
-		local slotID = ...
-		if slotID then
-			UpdateSingleSlot(slotID)
-			ScheduleUpdate()
-		end
+		local slot = ...
+		if not slot then return end
+		local actionType, id = GetActionInfo(slot)
+		local old = _slotCache[slot]
+		local changed = (old == nil) ~= (actionType == nil)
+			or (old and (old.t ~= actionType or old.id ~= id))
+		if not changed then return end
+		_slotCache[slot] = actionType and { t = actionType, id = id } or nil
+		_mapsDirty = true
+		ScheduleUpdate()
 	else
 		_mapsDirty = true
 		ScheduleUpdate()
