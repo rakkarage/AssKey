@@ -35,6 +35,7 @@ local _lastValidRecommendationTime = 0
 local _pendingUpdate = false
 local _spellToSlot = {}
 local _slotToBinding = {}
+local _slotCache = {}
 local _mapsDirty = true
 local _hookedButtons
 
@@ -355,7 +356,7 @@ local function InitializeOptions()
 
 	Settings.RegisterAddOnCategory(_category)
 end
-local _slotCache = {}
+
 _frame:RegisterEvent("ADDON_LOADED")
 _frame:SetScript("OnEvent", function(self, event, ...)
 	if event == "ADDON_LOADED" then
