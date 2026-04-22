@@ -6,6 +6,6 @@
 ## AddonCompartmentFunc: AssKey_Settings
 ## IconTexture: Interface/AddOns/AssKey/AssKey.png
 ## Version: v2026.4
-## Interface: 120001
+## Interface: 120005
 
 AssKey.lua
