@@ -399,7 +399,7 @@ _frame:SetScript("OnEvent", function(self, event, ...)
 end)
 
 function AssKey_Settings()
-	if not InCombatLockdown() and _category then
+	if not InCombatLockdown() then
 		Settings.OpenToCategory(_category:GetID())
 	end
 end
