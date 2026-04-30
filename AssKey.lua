@@ -2,7 +2,7 @@
 
 local _addonName = ...
 
-local _frame = CreateFrame("Frame")
+local _frame = CreateFrame("Frame", nil, UIParent) -- inherit visibility & scaling
 _frame:SetFrameStrata("MEDIUM")
 _frame:SetFrameLevel(9999)
 _frame:SetSize(50, 50)
